@@ -48,16 +48,24 @@ button{
 
 button:hover{background:#0d4fa8}
 
-button.challengeBtn{
+.challengeBtn{
   padding:9px 13px;
   font-size:14px;
   border-radius:9px;
 }
 
-button.disabledBtn{
-  background:#aab4c0;
-  cursor:not-allowed;
+.acceptBtn{
+  background:#218739;
+  margin-right:8px;
 }
+
+.acceptBtn:hover{background:#17672a}
+
+.declineBtn{
+  background:#b42318;
+}
+
+.declineBtn:hover{background:#8e1c13}
 
 .card{
   background:white;
@@ -96,6 +104,13 @@ th,td{
 .success{
   padding:12px;
   background:#eaf8ee;
+  border-radius:10px;
+  margin:12px 0;
+}
+
+.warning{
+  padding:12px;
+  background:#fff3cd;
   border-radius:10px;
   margin:12px 0;
 }
@@ -157,8 +172,6 @@ let activeChallenge = null;
 
 function show(page){
 
-  const c=document.getElementById("content");
-
   if(page==="board"){
     renderBoard();
   }
@@ -172,7 +185,7 @@ function show(page){
   }
 
   if(page==="rules"){
-    c.innerHTML=
+    document.getElementById("content").innerHTML=
       "<h2>Rules / Help</h2>"+
       "<p><b>Challenge:</b> You may challenge up to 3 positions above your team.</p>"+
       "<p><b>Match:</b> Best 2 of 3 games to 11, win by 2.</p>"+
@@ -197,6 +210,7 @@ function renderBoard(){
     "<select onchange='selectTeam(this.value)'>"+options+"</select>";
 
   if(myTeamIndex>=0){
+
     const first=Math.max(0,myTeamIndex-3);
     const last=myTeamIndex-1;
 
@@ -230,7 +244,7 @@ function renderBoard(){
       "<td>"+team.wl+"</td>"+
       "<td>";
 
-    if(eligible){
+    if(eligible && !activeChallenge){
       html += "<button class='challengeBtn' onclick='issueChallenge("+i+")'>Challenge</button>";
     }else if(mine){
       html += "<span class='muted'>Your team</span>";
@@ -284,18 +298,88 @@ function renderChallenges(){
   const challenger=teams[activeChallenge.challenger];
   const challenged=teams[activeChallenge.challenged];
 
+  if(myTeamIndex===activeChallenge.challenger){
+
+    let message =
+      "<h2>My Challenges</h2>"+
+      "<div class='success'>"+
+      "<b>Outgoing Challenge</b><br><br>"+
+      "#"+(activeChallenge.challenger+1)+" "+challenger.name+
+      " has challenged "+
+      "#"+(activeChallenge.challenged+1)+" "+challenged.name+
+      ".<br><br>"+
+      "<b>Status:</b> "+activeChallenge.status+
+      "</div>";
+
+    if(activeChallenge.status==="Accepted"){
+      message +=
+        "<p><b>The challenge has been accepted.</b></p>"+
+        "<p class='muted'>The match must be played within 7 days.</p>";
+    }
+
+    if(activeChallenge.status==="Declined"){
+      message +=
+        "<p><b>The challenge was declined.</b></p>";
+    }
+
+    c.innerHTML=message+"<button onclick='show(\"board\")'>Back to Leaderboard</button>";
+    return;
+  }
+
+  if(myTeamIndex===activeChallenge.challenged){
+
+    if(activeChallenge.status==="Pending"){
+      c.innerHTML=
+        "<h2>My Challenges</h2>"+
+        "<div class='warning'>"+
+        "<b>Incoming Challenge</b><br><br>"+
+        "#"+(activeChallenge.challenger+1)+" "+challenger.name+
+        " has challenged your team, "+
+        "#"+(activeChallenge.challenged+1)+" "+challenged.name+
+        ".</div>"+
+        "<button class='acceptBtn' onclick='acceptChallenge()'>Accept Challenge</button>"+
+        "<button class='declineBtn' onclick='declineChallenge()'>Decline Challenge</button>";
+      return;
+    }
+
+    if(activeChallenge.status==="Accepted"){
+      c.innerHTML=
+        "<h2>My Challenges</h2>"+
+        "<div class='success'>"+
+        "<b>Challenge Accepted</b><br><br>"+
+        challenged.name+" accepted the challenge from "+challenger.name+".<br><br>"+
+        "<b>Status:</b> Accepted"+
+        "</div>"+
+        "<p class='muted'>The match must be played within 7 days.</p>";
+      return;
+    }
+
+    if(activeChallenge.status==="Declined"){
+      c.innerHTML=
+        "<h2>My Challenges</h2>"+
+        "<div class='warning'>"+
+        "<b>Challenge Declined</b><br><br>"+
+        challenged.name+" declined the challenge from "+challenger.name+"."+
+        "</div>";
+      return;
+    }
+  }
+
   c.innerHTML=
     "<h2>My Challenges</h2>"+
-    "<div class='success'>"+
-    "<b>Challenge issued successfully.</b><br><br>"+
-    "#"+(activeChallenge.challenger+1)+" "+challenger.name+
-    " has challenged "+
-    "#"+(activeChallenge.challenged+1)+" "+challenged.name+
-    ".<br><br>"+
-    "<b>Status:</b> "+activeChallenge.status+
-    "</div>"+
-    "<p class='muted'>Accepted matches must be played within 7 days.</p>"+
-    "<button onclick='show(\"board\")'>Back to Leaderboard</button>";
+    "<p>No active challenge involving this team.</p>";
+}
+
+function acceptChallenge(){
+  if(!activeChallenge) return;
+  activeChallenge.status="Accepted";
+  renderChallenges();
+}
+
+function declineChallenge(){
+  if(!activeChallenge) return;
+  activeChallenge.status="Declined";
+  renderChallenges();
 }
 
 function renderScore(){
@@ -305,15 +389,23 @@ function renderScore(){
   if(!activeChallenge){
     c.innerHTML=
       "<h2>Enter Score</h2>"+
-      "<p>No accepted challenge is available yet.</p>"+
-      "<p class='muted'>A challenge must first be issued and accepted.</p>";
+      "<p>No challenge is available.</p>";
+    return;
+  }
+
+  if(activeChallenge.status!=="Accepted"){
+    c.innerHTML=
+      "<h2>Enter Score</h2>"+
+      "<p>The challenge has not been accepted yet.</p>"+
+      "<p class='muted'>Scores can only be entered after the challenged team accepts.</p>";
     return;
   }
 
   c.innerHTML=
     "<h2>Enter Score</h2>"+
-    "<p>Challenge exists, but it has not yet been accepted.</p>"+
-    "<p class='muted'>The next version will add Accept / Decline and score entry.</p>";
+    "<div class='success'><b>Challenge accepted.</b></div>"+
+    "<p>You may now enter the match result.</p>"+
+    "<p class='muted'>The next step will add the actual game-score fields and opponent confirmation.</p>";
 }
 
 show("board");
