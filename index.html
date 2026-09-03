@@ -435,8 +435,34 @@ function acceptChallenge(){
 }
 
 function declineChallenge(){
-  challenge.status="Declined";
-  renderChallenges();
+    const reason = prompt(
+        "Why are you declining this challenge?\n\n" +
+        "1 - Scheduling conflict\n" +
+        "2 - Injury / illness\n" +
+        "3 - Away / unavailable\n" +
+        "4 - Other"
+    );
+
+    if(reason === null) return;
+
+    let declineReason = "";
+
+    if(reason === "1"){
+        declineReason = "Scheduling conflict";
+    } else if(reason === "2"){
+        declineReason = "Injury / illness";
+    } else if(reason === "3"){
+        declineReason = "Away / unavailable";
+    } else if(reason === "4"){
+        declineReason = prompt("Please enter the reason:") || "Other";
+    } else {
+        alert("Please enter 1, 2, 3, or 4.");
+        return;
+    }
+
+    challenge.status = "Declined";
+    challenge.declineReason = declineReason;
+    renderChallenges();
 }
 
 function clearChallenge(){
