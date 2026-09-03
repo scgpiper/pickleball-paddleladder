@@ -380,7 +380,7 @@ function renderChallenges(){
       "<h2>My Challenges</h2>"+
       "<div class='warning'><b>Challenge Declined</b><br><br>"+
       challenge.challenged.name+" declined the challenge from "+challenge.challenger.name+
-      ".</div>"+
+      ".<br><br><b>Reason:</b> "+challenge.declineReason+"</div>"+
       "<button onclick='clearChallenge()'>Close Challenge</button>";
     return;
   }
