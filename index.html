@@ -173,6 +173,7 @@ let teams = [
 ];
 
 let myTeam = null;
+ let partnerListings = []; 
 let challenge = null;
 
 function teamIndex(team){
@@ -666,16 +667,77 @@ function renderPartners(){
 
     "<h3>Players Looking for Partners</h3>" +
 
-    "<div class='warning'>" +
-      "<b>Partner listings will appear here.</b><br><br>" +
-      "Players will be able to list their name, gender, DUPR and availability." +
-    "</div>" +
+(partnerListings.length === 0
+  ? "<div class='warning'><b>No players are currently looking for a partner.</b></div>"
+  : partnerListings.map(function(player){
+      return "<div class='success'>" +
+        "<b>" + player.name + "</b><br>" +
+        "Gender: " + player.gender + "<br>" +
+        "DUPR: " + player.dupr + "<br>" +
+        "Availability: " + player.availability +
+      "</div><br>";
+    }).join("")
+) +
 
     "<br>" +
 
-    "<button onclick='alert(\"Player registration will be added next.\")'>" +
+    "<button onclick='renderPartnerForm()'>" +
       "➕ List Me as Looking for a Partner" +
     "</button>";
+function renderPartnerForm(){
+  const c = document.getElementById("content");
+
+  c.innerHTML =
+    "<h2>🤝 Looking for a Partner</h2>" +
+    "<p>Add yourself to the Partner Connect list.</p>" +
+
+    "<p><b>Name</b><br>" +
+    "<input id='partnerName' placeholder='Your name' style='width:100%;padding:10px;'></p>" +
+
+    "<p><b>Gender</b><br>" +
+    "<select id='partnerGender' style='width:100%;padding:10px;'>" +
+      "<option value='Male'>Male</option>" +
+      "<option value='Female'>Female</option>" +
+    "</select></p>" +
+
+    "<p><b>DUPR</b><br>" +
+    "<input id='partnerDupr' type='number' step='0.01' placeholder='Example: 4.25' style='width:100%;padding:10px;'></p>" +
+
+    "<p><b>Looking for</b><br>" +
+    "<select id='partnerLadder' style='width:100%;padding:10px;'>" +
+      "<option value='mens'>Men's Ladder</option>" +
+      "<option value='womens'>Women's Ladder</option>" +
+      "<option value='mixed'>Mixed Ladder</option>" +
+    "</select></p>" +
+
+    "<p><b>Availability</b><br>" +
+    "<input id='partnerAvailability' placeholder='Example: Weekday mornings' style='width:100%;padding:10px;'></p>" +
+
+    "<button onclick='savePartnerListing()'>Add Me to Partner Connect</button> " +
+    "<button onclick='renderPartners()'>Cancel</button>";
+}}
+
+  function savePartnerListing(){
+  const name = document.getElementById("partnerName").value.trim();
+  const gender = document.getElementById("partnerGender").value;
+  const dupr = document.getElementById("partnerDupr").value;
+  const ladder = document.getElementById("partnerLadder").value;
+  const availability = document.getElementById("partnerAvailability").value.trim();
+
+  if(!name || !dupr || !availability){
+    alert("Please complete your name, DUPR and availability.");
+    return;
+  }
+
+  partnerListings.push({
+    name: name,
+    gender: gender,
+    dupr: dupr,
+    ladder: ladder,
+    availability: availability
+  });
+
+  renderPartners();
 }
 show("board");
 
