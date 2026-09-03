@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pickleball PaddleLadder</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f4f7fb;
+  color: #10213b;
+}
+
+header {
+  background: #0d2f63;
+  color: white;
+  padding: 22px;
+  text-align: center;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+header p {
+  margin: 6px 0 0;
+}
+
+main {
+  max-width: 760px;
+  margin: auto;
+  padding: 18px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+button {
+  border: 0;
+  border-radius: 14px;
+  padding: 22px 10px;
+  background: #1261c9;
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #0d4fa8;
+}
+
+.card {
+  background: white;
+  border: 1px solid #dbe4ef;
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 10px 6px;
+  border-bottom: 1px solid #edf1f6;
+  text-align: left;
+}
+
+.top10 {
+  background: #fff9dc;
+}
+
+.muted {
+  color: #6b778c;
+  font-size: 13px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>Pickleball PaddleLadder</h1>
+<p>Challenge. Compete. Climb.</p>
+</header>
+
+<main>
+
+<div class="grid">
+<button onclick="show('board')">🏆 Leaderboard</button>
+<button onclick="show('challenge')">⚔️ My Challenges</button>
+<button onclick="show('score')">✍️ Enter Score</button>
+<button onclick="show('rules')">❓ Rules / Help</button>
+</div>
+
+<div id="content" class="card"></div>
+
+</main>
+
+<script>
+
+const teams = [
+["Baseline Bandits","Adams / Brown",9.10,"8-1"],
+["Kitchen Kings","Carter / Davis",8.95,"7-2"],
+["Third Shot Crew","Evans / Foster",8.72,"6-2"],
+["Dink Dynasty","Green / Harris",8.55,"6-3"],
+["Paddle Pressure","Owens / Parker",7.91,"5-4"],
+["Court Commanders","Irwin / Jones",8.38,"5-4"],
+["Side Out","King / Lewis",8.20,"5-4"],
+["No Man's Land","Martin / Nelson",8.05,"4-3"],
+["Court Rush","Wilson / Young",7.51,"3-3"],
+["Drop Shots","Quinn / Roberts",7.80,"3-4"],
+["The Challengers","Underwood / Vance",7.56,"5-2"]
+];
+
+function show(x) {
+
+const c = document.getElementById("content");
+
+if (x === "board") {
+
+c.innerHTML =
+"<h2>Leaderboard</h2>" +
+"<table>" +
+"<tr><th>Rank</th><th>Team</th><th>Combined DUPR</th><th>W-L</th></tr>" +
+
+teams.map((t,i) =>
+"<tr class='" + (i < 10 ? "top10" : "") + "'>" +
+"<td><b>#" + (i+1) + "</b></td>" +
+"<td><b>" + t[0] + "</b><div class='muted'>" + t[1] + "</div></td>" +
+"<td>" + t[2].toFixed(2) + "</td>" +
+"<td>" + t[3] + "</td>" +
+"</tr>"
+).join("") +
+
+"</table>";
+}
+
+if (x === "challenge") {
+
+c.innerHTML =
+"<h2>My Challenges</h2>" +
+"<p>No active challenges yet.</p>" +
+"<p class='muted'>Challenge up to 3 positions above. Accepted matches must be played within 7 days.</p>";
+}
+
+if (x === "score") {
+
+c.innerHTML =
+"<h2>Enter Score</h2>" +
+"<p>Select an accepted challenge to enter a score.</p>" +
+"<p class='muted'>Best 2 of 3 to 11, win by 2. Opponent confirmation is required.</p>";
+}
+
+if (x === "rules") {
+
+c.innerHTML =
+"<h2>Rules / Help</h2>" +
+"<p><b>Challenge:</b> You may challenge up to 3 positions above your team.</p>" +
+"<p><b>Match:</b> Best 2 of 3 games to 11, win by 2.</p>" +
+"<p><b>Challenger wins:</b> Challenger takes the challenged team's position.</p>" +
+"<p><b>New teams:</b> Combined DUPR determines initial placement, but a new team cannot enter the Top 10.</p>";
+}
+
+}
+
+show("board");
+
+</script>
+
+</body>
+</html>
