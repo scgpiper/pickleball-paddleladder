@@ -6,82 +6,112 @@
 <title>Pickleball PaddleLadder</title>
 
 <style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #f4f7fb;
-  color: #10213b;
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#f4f7fb;
+  color:#10213b;
 }
 
-header {
-  background: #0d2f63;
-  color: white;
-  padding: 22px;
-  text-align: center;
+header{
+  background:#0d2f63;
+  color:#fff;
+  padding:22px;
+  text-align:center;
 }
 
-header h1 {
-  margin: 0;
-  font-size: 28px;
+header h1{margin:0;font-size:28px}
+header p{margin:6px 0 0}
+
+main{
+  max-width:820px;
+  margin:auto;
+  padding:18px;
 }
 
-header p {
-  margin: 6px 0 0;
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
 }
 
-main {
-  max-width: 760px;
-  margin: auto;
-  padding: 18px;
+button{
+  border:0;
+  border-radius:14px;
+  padding:18px 10px;
+  background:#1261c9;
+  color:white;
+  font-size:18px;
+  font-weight:bold;
+  cursor:pointer;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+button:hover{background:#0d4fa8}
+
+button.challengeBtn{
+  padding:9px 13px;
+  font-size:14px;
+  border-radius:9px;
 }
 
-button {
-  border: 0;
-  border-radius: 14px;
-  padding: 22px 10px;
-  background: #1261c9;
-  color: white;
-  font-size: 18px;
-  font-weight: bold;
-  cursor: pointer;
+button.disabledBtn{
+  background:#aab4c0;
+  cursor:not-allowed;
 }
 
-button:hover {
-  background: #0d4fa8;
+.card{
+  background:white;
+  border:1px solid #dbe4ef;
+  border-radius:14px;
+  padding:16px;
+  margin-top:16px;
 }
 
-.card {
-  background: white;
-  border: 1px solid #dbe4ef;
-  border-radius: 14px;
-  padding: 16px;
-  margin-top: 16px;
+table{
+  width:100%;
+  border-collapse:collapse;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
+th,td{
+  padding:10px 6px;
+  border-bottom:1px solid #edf1f6;
+  text-align:left;
 }
 
-th, td {
-  padding: 10px 6px;
-  border-bottom: 1px solid #edf1f6;
-  text-align: left;
+.top10{background:#fff9dc}
+.myteam{outline:3px solid #1261c9}
+
+.muted{
+  color:#6b778c;
+  font-size:13px;
 }
 
-.top10 {
-  background: #fff9dc;
+.notice{
+  padding:12px;
+  background:#eaf3ff;
+  border-radius:10px;
+  margin:12px 0;
 }
 
-.muted {
-  color: #6b778c;
-  font-size: 13px;
+.success{
+  padding:12px;
+  background:#eaf8ee;
+  border-radius:10px;
+  margin:12px 0;
+}
+
+select{
+  width:100%;
+  padding:12px;
+  border:1px solid #ccd6e2;
+  border-radius:10px;
+  font-size:16px;
+  margin:8px 0 16px;
+}
+
+@media(max-width:650px){
+  .grid{grid-template-columns:1fr}
+  th:nth-child(3),td:nth-child(3){display:none}
 }
 </style>
 </head>
@@ -109,68 +139,181 @@ th, td {
 <script>
 
 const teams = [
-["Baseline Bandits","Adams / Brown",9.10,"8-1"],
-["Kitchen Kings","Carter / Davis",8.95,"7-2"],
-["Third Shot Crew","Evans / Foster",8.72,"6-2"],
-["Dink Dynasty","Green / Harris",8.55,"6-3"],
-["Paddle Pressure","Owens / Parker",7.91,"5-4"],
-["Court Commanders","Irwin / Jones",8.38,"5-4"],
-["Side Out","King / Lewis",8.20,"5-4"],
-["No Man's Land","Martin / Nelson",8.05,"4-3"],
-["Court Rush","Wilson / Young",7.51,"3-3"],
-["Drop Shots","Quinn / Roberts",7.80,"3-4"],
-["The Challengers","Underwood / Vance",7.56,"5-2"]
+{name:"Baseline Bandits",players:"Adams / Brown",dupr:9.10,wl:"8-1"},
+{name:"Kitchen Kings",players:"Carter / Davis",dupr:8.95,wl:"7-2"},
+{name:"Third Shot Crew",players:"Evans / Foster",dupr:8.72,wl:"6-2"},
+{name:"Dink Dynasty",players:"Green / Harris",dupr:8.55,wl:"6-3"},
+{name:"Paddle Pressure",players:"Owens / Parker",dupr:7.91,wl:"5-4"},
+{name:"Court Commanders",players:"Irwin / Jones",dupr:8.38,wl:"5-4"},
+{name:"Side Out",players:"King / Lewis",dupr:8.20,wl:"5-4"},
+{name:"No Man's Land",players:"Martin / Nelson",dupr:8.05,wl:"4-3"},
+{name:"Court Rush",players:"Wilson / Young",dupr:7.51,wl:"3-3"},
+{name:"Drop Shots",players:"Quinn / Roberts",dupr:7.80,wl:"3-4"},
+{name:"The Challengers",players:"Underwood / Vance",dupr:7.56,wl:"5-2"}
 ];
 
-function show(x) {
+let myTeamIndex = -1;
+let activeChallenge = null;
 
-const c = document.getElementById("content");
+function show(page){
 
-if (x === "board") {
+  const c=document.getElementById("content");
 
-c.innerHTML =
-"<h2>Leaderboard</h2>" +
-"<table>" +
-"<tr><th>Rank</th><th>Team</th><th>Combined DUPR</th><th>W-L</th></tr>" +
+  if(page==="board"){
+    renderBoard();
+  }
 
-teams.map((t,i) =>
-"<tr class='" + (i < 10 ? "top10" : "") + "'>" +
-"<td><b>#" + (i+1) + "</b></td>" +
-"<td><b>" + t[0] + "</b><div class='muted'>" + t[1] + "</div></td>" +
-"<td>" + t[2].toFixed(2) + "</td>" +
-"<td>" + t[3] + "</td>" +
-"</tr>"
-).join("") +
+  if(page==="challenge"){
+    renderChallenges();
+  }
 
-"</table>";
+  if(page==="score"){
+    renderScore();
+  }
+
+  if(page==="rules"){
+    c.innerHTML=
+      "<h2>Rules / Help</h2>"+
+      "<p><b>Challenge:</b> You may challenge up to 3 positions above your team.</p>"+
+      "<p><b>Match:</b> Best 2 of 3 games to 11, win by 2.</p>"+
+      "<p><b>Challenger wins:</b> Challenger takes the challenged team's position.</p>"+
+      "<p><b>New teams:</b> Combined DUPR determines initial placement, but a new team cannot enter the Top 10.</p>";
+  }
 }
 
-if (x === "challenge") {
+function renderBoard(){
 
-c.innerHTML =
-"<h2>My Challenges</h2>" +
-"<p>No active challenges yet.</p>" +
-"<p class='muted'>Challenge up to 3 positions above. Accepted matches must be played within 7 days.</p>";
+  const c=document.getElementById("content");
+
+  let options='<option value="-1">Choose your team...</option>';
+
+  teams.forEach((team,i)=>{
+    options += '<option value="'+i+'" '+(myTeamIndex===i?'selected':'')+'>#'+(i+1)+' — '+team.name+'</option>';
+  });
+
+  let html=
+    "<h2>Leaderboard</h2>"+
+    "<p><b>Which team are you?</b></p>"+
+    "<select onchange='selectTeam(this.value)'>"+options+"</select>";
+
+  if(myTeamIndex>=0){
+    const first=Math.max(0,myTeamIndex-3);
+    const last=myTeamIndex-1;
+
+    if(last>=first){
+      html +=
+        "<div class='notice'><b>You are #"+(myTeamIndex+1)+" "+teams[myTeamIndex].name+
+        ".</b> You may challenge ranks #"+(first+1)+" through #"+(last+1)+".</div>";
+    }else{
+      html += "<div class='notice'><b>You are ranked #1.</b> There is nobody above you to challenge.</div>";
+    }
+  }
+
+  html +=
+    "<table>"+
+    "<tr><th>Rank</th><th>Team</th><th>Combined DUPR</th><th>W-L</th><th></th></tr>";
+
+  teams.forEach((team,i)=>{
+
+    const eligible =
+      myTeamIndex>=0 &&
+      i<myTeamIndex &&
+      i>=myTeamIndex-3;
+
+    const mine = i===myTeamIndex;
+
+    html +=
+      "<tr class='"+(i<10?"top10 ":"")+(mine?"myteam":"")+"'>"+
+      "<td><b>#"+(i+1)+"</b></td>"+
+      "<td><b>"+team.name+"</b><div class='muted'>"+team.players+"</div></td>"+
+      "<td>"+team.dupr.toFixed(2)+"</td>"+
+      "<td>"+team.wl+"</td>"+
+      "<td>";
+
+    if(eligible){
+      html += "<button class='challengeBtn' onclick='issueChallenge("+i+")'>Challenge</button>";
+    }else if(mine){
+      html += "<span class='muted'>Your team</span>";
+    }
+
+    html += "</td></tr>";
+  });
+
+  html += "</table>";
+
+  c.innerHTML=html;
 }
 
-if (x === "score") {
-
-c.innerHTML =
-"<h2>Enter Score</h2>" +
-"<p>Select an accepted challenge to enter a score.</p>" +
-"<p class='muted'>Best 2 of 3 to 11, win by 2. Opponent confirmation is required.</p>";
+function selectTeam(value){
+  myTeamIndex=parseInt(value);
+  renderBoard();
 }
 
-if (x === "rules") {
+function issueChallenge(opponentIndex){
 
-c.innerHTML =
-"<h2>Rules / Help</h2>" +
-"<p><b>Challenge:</b> You may challenge up to 3 positions above your team.</p>" +
-"<p><b>Match:</b> Best 2 of 3 games to 11, win by 2.</p>" +
-"<p><b>Challenger wins:</b> Challenger takes the challenged team's position.</p>" +
-"<p><b>New teams:</b> Combined DUPR determines initial placement, but a new team cannot enter the Top 10.</p>";
+  if(myTeamIndex<0) return;
+
+  const distance=myTeamIndex-opponentIndex;
+
+  if(distance<1 || distance>3){
+    alert("That team is outside the 3-position challenge limit.");
+    return;
+  }
+
+  activeChallenge={
+    challenger:myTeamIndex,
+    challenged:opponentIndex,
+    status:"Pending"
+  };
+
+  renderChallenges();
 }
 
+function renderChallenges(){
+
+  const c=document.getElementById("content");
+
+  if(!activeChallenge){
+    c.innerHTML=
+      "<h2>My Challenges</h2>"+
+      "<p>No active challenges yet.</p>"+
+      "<p class='muted'>Select your team on the Leaderboard, then challenge a team up to 3 positions above.</p>";
+    return;
+  }
+
+  const challenger=teams[activeChallenge.challenger];
+  const challenged=teams[activeChallenge.challenged];
+
+  c.innerHTML=
+    "<h2>My Challenges</h2>"+
+    "<div class='success'>"+
+    "<b>Challenge issued successfully.</b><br><br>"+
+    "#"+(activeChallenge.challenger+1)+" "+challenger.name+
+    " has challenged "+
+    "#"+(activeChallenge.challenged+1)+" "+challenged.name+
+    ".<br><br>"+
+    "<b>Status:</b> "+activeChallenge.status+
+    "</div>"+
+    "<p class='muted'>Accepted matches must be played within 7 days.</p>"+
+    "<button onclick='show(\"board\")'>Back to Leaderboard</button>";
+}
+
+function renderScore(){
+
+  const c=document.getElementById("content");
+
+  if(!activeChallenge){
+    c.innerHTML=
+      "<h2>Enter Score</h2>"+
+      "<p>No accepted challenge is available yet.</p>"+
+      "<p class='muted'>A challenge must first be issued and accepted.</p>";
+    return;
+  }
+
+  c.innerHTML=
+    "<h2>Enter Score</h2>"+
+    "<p>Challenge exists, but it has not yet been accepted.</p>"+
+    "<p class='muted'>The next version will add Accept / Decline and score entry.</p>";
 }
 
 show("board");
