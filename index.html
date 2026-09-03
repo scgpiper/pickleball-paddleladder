@@ -24,7 +24,7 @@ header h1{margin:0;font-size:28px}
 header p{margin:6px 0 0}
 
 main{
-  max-width:820px;
+  max-width:850px;
   margin:auto;
   padding:18px;
 }
@@ -40,7 +40,7 @@ button{
   border-radius:14px;
   padding:18px 10px;
   background:#1261c9;
-  color:white;
+  color:#fff;
   font-size:18px;
   font-weight:bold;
   cursor:pointer;
@@ -48,27 +48,24 @@ button{
 
 button:hover{background:#0d4fa8}
 
-.challengeBtn{
+.challengeBtn,
+.smallBtn{
   padding:9px 13px;
   font-size:14px;
   border-radius:9px;
 }
 
-.acceptBtn{
-  background:#218739;
-  margin-right:8px;
-}
-
+.acceptBtn{background:#218739}
 .acceptBtn:hover{background:#17672a}
 
-.declineBtn{
-  background:#b42318;
-}
+.declineBtn,
+.disputeBtn{background:#b42318}
 
-.declineBtn:hover{background:#8e1c13}
+.declineBtn:hover,
+.disputeBtn:hover{background:#8e1c13}
 
 .card{
-  background:white;
+  background:#fff;
   border:1px solid #dbe4ef;
   border-radius:14px;
   padding:16px;
@@ -94,34 +91,41 @@ th,td{
   font-size:13px;
 }
 
-.notice{
-  padding:12px;
-  background:#eaf3ff;
-  border-radius:10px;
-  margin:12px 0;
-}
-
-.success{
-  padding:12px;
-  background:#eaf8ee;
-  border-radius:10px;
-  margin:12px 0;
-}
-
+.notice,
+.success,
 .warning{
   padding:12px;
-  background:#fff3cd;
   border-radius:10px;
   margin:12px 0;
+}
+
+.notice{background:#eaf3ff}
+.success{background:#eaf8ee}
+.warning{background:#fff3cd}
+
+select,
+input{
+  padding:11px;
+  border:1px solid #ccd6e2;
+  border-radius:9px;
+  font-size:16px;
+  box-sizing:border-box;
 }
 
 select{
   width:100%;
-  padding:12px;
-  border:1px solid #ccd6e2;
-  border-radius:10px;
-  font-size:16px;
   margin:8px 0 16px;
+}
+
+.scoreTable input{
+  width:75px;
+}
+
+.actionRow{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:14px;
 }
 
 @media(max-width:650px){
@@ -134,17 +138,17 @@ select{
 <body>
 
 <header>
-<h1>Pickleball PaddleLadder</h1>
-<p>Challenge. Compete. Climb.</p>
+  <h1>Pickleball PaddleLadder</h1>
+  <p>Challenge. Compete. Climb.</p>
 </header>
 
 <main>
 
 <div class="grid">
-<button onclick="show('board')">🏆 Leaderboard</button>
-<button onclick="show('challenge')">⚔️ My Challenges</button>
-<button onclick="show('score')">✍️ Enter Score</button>
-<button onclick="show('rules')">❓ Rules / Help</button>
+  <button onclick="show('board')">🏆 Leaderboard</button>
+  <button onclick="show('challenge')">⚔️ My Challenges</button>
+  <button onclick="show('score')">✍️ Enter Score</button>
+  <button onclick="show('rules')">❓ Rules / Help</button>
 </div>
 
 <div id="content" class="card"></div>
@@ -153,44 +157,42 @@ select{
 
 <script>
 
-const teams = [
-{name:"Baseline Bandits",players:"Adams / Brown",dupr:9.10,wl:"8-1"},
-{name:"Kitchen Kings",players:"Carter / Davis",dupr:8.95,wl:"7-2"},
-{name:"Third Shot Crew",players:"Evans / Foster",dupr:8.72,wl:"6-2"},
-{name:"Dink Dynasty",players:"Green / Harris",dupr:8.55,wl:"6-3"},
-{name:"Paddle Pressure",players:"Owens / Parker",dupr:7.91,wl:"5-4"},
-{name:"Court Commanders",players:"Irwin / Jones",dupr:8.38,wl:"5-4"},
-{name:"Side Out",players:"King / Lewis",dupr:8.20,wl:"5-4"},
-{name:"No Man's Land",players:"Martin / Nelson",dupr:8.05,wl:"4-3"},
-{name:"Court Rush",players:"Wilson / Young",dupr:7.51,wl:"3-3"},
-{name:"Drop Shots",players:"Quinn / Roberts",dupr:7.80,wl:"3-4"},
-{name:"The Challengers",players:"Underwood / Vance",dupr:7.56,wl:"5-2"}
+let teams = [
+  {name:"Baseline Bandits",players:"Adams / Brown",dupr:9.10,wins:8,losses:1},
+  {name:"Kitchen Kings",players:"Carter / Davis",dupr:8.95,wins:7,losses:2},
+  {name:"Third Shot Crew",players:"Evans / Foster",dupr:8.72,wins:6,losses:2},
+  {name:"Dink Dynasty",players:"Green / Harris",dupr:8.55,wins:6,losses:3},
+  {name:"Paddle Pressure",players:"Owens / Parker",dupr:7.91,wins:5,losses:4},
+  {name:"Court Commanders",players:"Irwin / Jones",dupr:8.38,wins:5,losses:4},
+  {name:"Side Out",players:"King / Lewis",dupr:8.20,wins:5,losses:4},
+  {name:"No Man's Land",players:"Martin / Nelson",dupr:8.05,wins:4,losses:3},
+  {name:"Court Rush",players:"Wilson / Young",dupr:7.51,wins:3,losses:3},
+  {name:"Drop Shots",players:"Quinn / Roberts",dupr:7.80,wins:3,losses:4},
+  {name:"The Challengers",players:"Underwood / Vance",dupr:7.56,wins:5,losses:2}
 ];
 
-let myTeamIndex = -1;
-let activeChallenge = null;
+let myTeam = null;
+let challenge = null;
+
+function teamIndex(team){
+  return teams.indexOf(team);
+}
 
 function show(page){
 
-  if(page==="board"){
-    renderBoard();
-  }
-
-  if(page==="challenge"){
-    renderChallenges();
-  }
-
-  if(page==="score"){
-    renderScore();
-  }
+  if(page==="board") renderBoard();
+  if(page==="challenge") renderChallenges();
+  if(page==="score") renderScore();
 
   if(page==="rules"){
     document.getElementById("content").innerHTML=
       "<h2>Rules / Help</h2>"+
-      "<p><b>Challenge:</b> You may challenge up to 3 positions above your team.</p>"+
+      "<p><b>Challenge:</b> A team may challenge up to 3 positions above.</p>"+
       "<p><b>Match:</b> Best 2 of 3 games to 11, win by 2.</p>"+
-      "<p><b>Challenger wins:</b> Challenger takes the challenged team's position.</p>"+
-      "<p><b>New teams:</b> Combined DUPR determines initial placement, but a new team cannot enter the Top 10.</p>";
+      "<p><b>Challenger wins:</b> Challenger takes the challenged team's position. Teams between them move down one position.</p>"+
+      "<p><b>Challenged team wins:</b> Ladder positions do not change.</p>"+
+      "<p><b>Results:</b> The opposing team must confirm the submitted result before standings change.</p>"+
+      "<p><b>New teams:</b> Combined DUPR determines initial placement, but a new team cannot initially enter the Top 10.</p>";
   }
 }
 
@@ -198,10 +200,13 @@ function renderBoard(){
 
   const c=document.getElementById("content");
 
-  let options='<option value="-1">Choose your team...</option>';
+  let options='<option value="">Choose your team...</option>';
 
   teams.forEach((team,i)=>{
-    options += '<option value="'+i+'" '+(myTeamIndex===i?'selected':'')+'>#'+(i+1)+' — '+team.name+'</option>';
+    options +=
+      '<option value="'+i+'" '+(team===myTeam?'selected':'')+'>'+
+      '#'+(i+1)+' — '+team.name+
+      '</option>';
   });
 
   let html=
@@ -209,75 +214,91 @@ function renderBoard(){
     "<p><b>Which team are you?</b></p>"+
     "<select onchange='selectTeam(this.value)'>"+options+"</select>";
 
-  if(myTeamIndex>=0){
+  const myIndex=myTeam ? teamIndex(myTeam) : -1;
 
-    const first=Math.max(0,myTeamIndex-3);
-    const last=myTeamIndex-1;
+  if(myIndex>=0){
+    const first=Math.max(0,myIndex-3);
+    const last=myIndex-1;
 
     if(last>=first){
-      html +=
-        "<div class='notice'><b>You are #"+(myTeamIndex+1)+" "+teams[myTeamIndex].name+
+      html+=
+        "<div class='notice'><b>You are #"+(myIndex+1)+" "+myTeam.name+
         ".</b> You may challenge ranks #"+(first+1)+" through #"+(last+1)+".</div>";
     }else{
-      html += "<div class='notice'><b>You are ranked #1.</b> There is nobody above you to challenge.</div>";
+      html+="<div class='notice'><b>You are ranked #1.</b> There is nobody above you to challenge.</div>";
     }
   }
 
-  html +=
+  html+=
     "<table>"+
     "<tr><th>Rank</th><th>Team</th><th>Combined DUPR</th><th>W-L</th><th></th></tr>";
 
   teams.forEach((team,i)=>{
 
     const eligible =
-      myTeamIndex>=0 &&
-      i<myTeamIndex &&
-      i>=myTeamIndex-3;
+      myIndex>=0 &&
+      i<myIndex &&
+      i>=myIndex-3;
 
-    const mine = i===myTeamIndex;
+    const mine=team===myTeam;
 
-    html +=
+    const challengeBusy =
+      challenge &&
+      ["Pending","Accepted","Awaiting Confirmation"].includes(challenge.status);
+
+    html+=
       "<tr class='"+(i<10?"top10 ":"")+(mine?"myteam":"")+"'>"+
       "<td><b>#"+(i+1)+"</b></td>"+
       "<td><b>"+team.name+"</b><div class='muted'>"+team.players+"</div></td>"+
       "<td>"+team.dupr.toFixed(2)+"</td>"+
-      "<td>"+team.wl+"</td>"+
+      "<td>"+team.wins+"-"+team.losses+"</td>"+
       "<td>";
 
-    if(eligible && !activeChallenge){
-      html += "<button class='challengeBtn' onclick='issueChallenge("+i+")'>Challenge</button>";
+    if(eligible && !challengeBusy){
+      html+=
+        "<button class='challengeBtn' onclick='issueChallenge("+i+")'>Challenge</button>";
     }else if(mine){
-      html += "<span class='muted'>Your team</span>";
+      html+="<span class='muted'>Your team</span>";
     }
 
-    html += "</td></tr>";
+    html+="</td></tr>";
   });
 
-  html += "</table>";
+  html+="</table>";
 
   c.innerHTML=html;
 }
 
 function selectTeam(value){
-  myTeamIndex=parseInt(value);
+
+  if(value===""){
+    myTeam=null;
+  }else{
+    myTeam=teams[parseInt(value)];
+  }
+
   renderBoard();
 }
 
 function issueChallenge(opponentIndex){
 
-  if(myTeamIndex<0) return;
+  if(!myTeam) return;
 
-  const distance=myTeamIndex-opponentIndex;
+  const myIndex=teamIndex(myTeam);
+  const distance=myIndex-opponentIndex;
 
   if(distance<1 || distance>3){
     alert("That team is outside the 3-position challenge limit.");
     return;
   }
 
-  activeChallenge={
-    challenger:myTeamIndex,
-    challenged:opponentIndex,
-    status:"Pending"
+  challenge={
+    challenger:myTeam,
+    challenged:teams[opponentIndex],
+    status:"Pending",
+    submittedBy:null,
+    scores:null,
+    winner:null
   };
 
   renderChallenges();
@@ -287,7 +308,14 @@ function renderChallenges(){
 
   const c=document.getElementById("content");
 
-  if(!activeChallenge){
+  if(!myTeam){
+    c.innerHTML=
+      "<h2>My Challenges</h2>"+
+      "<p>Please select your team from the Leaderboard first.</p>";
+    return;
+  }
+
+  if(!challenge){
     c.innerHTML=
       "<h2>My Challenges</h2>"+
       "<p>No active challenges yet.</p>"+
@@ -295,117 +323,299 @@ function renderChallenges(){
     return;
   }
 
-  const challenger=teams[activeChallenge.challenger];
-  const challenged=teams[activeChallenge.challenged];
-
-  if(myTeamIndex===activeChallenge.challenger){
-
-    let message =
+  if(myTeam!==challenge.challenger && myTeam!==challenge.challenged){
+    c.innerHTML=
       "<h2>My Challenges</h2>"+
-      "<div class='success'>"+
-      "<b>Outgoing Challenge</b><br><br>"+
-      "#"+(activeChallenge.challenger+1)+" "+challenger.name+
-      " has challenged "+
-      "#"+(activeChallenge.challenged+1)+" "+challenged.name+
-      ".<br><br>"+
-      "<b>Status:</b> "+activeChallenge.status+
-      "</div>";
-
-    if(activeChallenge.status==="Accepted"){
-      message +=
-        "<p><b>The challenge has been accepted.</b></p>"+
-        "<p class='muted'>The match must be played within 7 days.</p>";
-    }
-
-    if(activeChallenge.status==="Declined"){
-      message +=
-        "<p><b>The challenge was declined.</b></p>";
-    }
-
-    c.innerHTML=message+"<button onclick='show(\"board\")'>Back to Leaderboard</button>";
+      "<p>No active challenge involving this team.</p>";
     return;
   }
 
-  if(myTeamIndex===activeChallenge.challenged){
+  const challengerRank=teamIndex(challenge.challenger)+1;
+  const challengedRank=teamIndex(challenge.challenged)+1;
 
-    if(activeChallenge.status==="Pending"){
-      c.innerHTML=
-        "<h2>My Challenges</h2>"+
-        "<div class='warning'>"+
-        "<b>Incoming Challenge</b><br><br>"+
-        "#"+(activeChallenge.challenger+1)+" "+challenger.name+
-        " has challenged your team, "+
-        "#"+(activeChallenge.challenged+1)+" "+challenged.name+
-        ".</div>"+
-        "<button class='acceptBtn' onclick='acceptChallenge()'>Accept Challenge</button>"+
-        "<button class='declineBtn' onclick='declineChallenge()'>Decline Challenge</button>";
-      return;
-    }
+  if(challenge.status==="Pending"){
 
-    if(activeChallenge.status==="Accepted"){
+    if(myTeam===challenge.challenger){
       c.innerHTML=
         "<h2>My Challenges</h2>"+
         "<div class='success'>"+
-        "<b>Challenge Accepted</b><br><br>"+
-        challenged.name+" accepted the challenge from "+challenger.name+".<br><br>"+
-        "<b>Status:</b> Accepted"+
+        "<b>Outgoing Challenge</b><br><br>"+
+        "#"+challengerRank+" "+challenge.challenger.name+
+        " has challenged #"+challengedRank+" "+challenge.challenged.name+
+        ".<br><br><b>Status:</b> Pending"+
         "</div>"+
-        "<p class='muted'>The match must be played within 7 days.</p>";
+        "<p class='muted'>Waiting for the challenged team to accept or decline.</p>";
       return;
     }
 
-    if(activeChallenge.status==="Declined"){
-      c.innerHTML=
-        "<h2>My Challenges</h2>"+
-        "<div class='warning'>"+
-        "<b>Challenge Declined</b><br><br>"+
-        challenged.name+" declined the challenge from "+challenger.name+"."+
-        "</div>";
-      return;
-    }
+    c.innerHTML=
+      "<h2>My Challenges</h2>"+
+      "<div class='warning'>"+
+      "<b>Incoming Challenge</b><br><br>"+
+      "#"+challengerRank+" "+challenge.challenger.name+
+      " has challenged your team, #"+challengedRank+" "+challenge.challenged.name+"."+
+      "</div>"+
+      "<div class='actionRow'>"+
+      "<button class='acceptBtn smallBtn' onclick='acceptChallenge()'>Accept Challenge</button>"+
+      "<button class='declineBtn smallBtn' onclick='declineChallenge()'>Decline Challenge</button>"+
+      "</div>";
+    return;
   }
 
-  c.innerHTML=
-    "<h2>My Challenges</h2>"+
-    "<p>No active challenge involving this team.</p>";
+  if(challenge.status==="Accepted"){
+    c.innerHTML=
+      "<h2>My Challenges</h2>"+
+      "<div class='success'>"+
+      "<b>Challenge Accepted</b><br><br>"+
+      challenge.challenged.name+" accepted the challenge from "+challenge.challenger.name+
+      ".<br><br><b>Status:</b> Accepted"+
+      "</div>"+
+      "<p>The match must be played within 7 days.</p>"+
+      "<button onclick='show(\"score\")'>Enter Match Result</button>";
+    return;
+  }
+
+  if(challenge.status==="Declined"){
+    c.innerHTML=
+      "<h2>My Challenges</h2>"+
+      "<div class='warning'><b>Challenge Declined</b><br><br>"+
+      challenge.challenged.name+" declined the challenge from "+challenge.challenger.name+
+      ".</div>"+
+      "<button onclick='clearChallenge()'>Close Challenge</button>";
+    return;
+  }
+
+  if(challenge.status==="Awaiting Confirmation"){
+
+    if(myTeam===challenge.submittedBy){
+      c.innerHTML=
+        "<h2>My Challenges</h2>"+
+        "<div class='warning'><b>Result Submitted</b><br><br>"+
+        scoreSummary()+
+        "<br><br><b>Status:</b> Waiting for opponent confirmation.</div>";
+      return;
+    }
+
+    c.innerHTML=
+      "<h2>My Challenges</h2>"+
+      "<div class='warning'><b>Result Awaiting Your Confirmation</b><br><br>"+
+      scoreSummary()+
+      "</div>"+
+      "<div class='actionRow'>"+
+      "<button class='acceptBtn smallBtn' onclick='confirmResult()'>Confirm Result</button>"+
+      "<button class='disputeBtn smallBtn' onclick='disputeResult()'>Dispute Result</button>"+
+      "</div>";
+    return;
+  }
+
+  if(challenge.status==="Completed"){
+    c.innerHTML=
+      "<h2>My Challenges</h2>"+
+      "<div class='success'><b>Match Confirmed</b><br><br>"+
+      challenge.winner.name+" won the match.<br><br>"+
+      "The leaderboard and W-L records have been updated."+
+      "</div>"+
+      "<button onclick='show(\"board\")'>View Leaderboard</button>";
+    return;
+  }
+
+  if(challenge.status==="Disputed"){
+    c.innerHTML=
+      "<h2>My Challenges</h2>"+
+      "<div class='warning'><b>Result Disputed</b><br><br>"+
+      "The opposing team did not confirm the submitted result. No standings were changed."+
+      "</div>"+
+      "<button onclick='resetResult()'>Re-enter Result</button>";
+  }
 }
 
 function acceptChallenge(){
-  if(!activeChallenge) return;
-  activeChallenge.status="Accepted";
+  challenge.status="Accepted";
   renderChallenges();
 }
 
 function declineChallenge(){
-  if(!activeChallenge) return;
-  activeChallenge.status="Declined";
+  challenge.status="Declined";
   renderChallenges();
+}
+
+function clearChallenge(){
+  challenge=null;
+  show("board");
 }
 
 function renderScore(){
 
   const c=document.getElementById("content");
 
-  if(!activeChallenge){
-    c.innerHTML=
-      "<h2>Enter Score</h2>"+
-      "<p>No challenge is available.</p>";
+  if(!myTeam){
+    c.innerHTML="<h2>Enter Score</h2><p>Please select your team first.</p>";
     return;
   }
 
-  if(activeChallenge.status!=="Accepted"){
+  if(!challenge || challenge.status!=="Accepted"){
     c.innerHTML=
       "<h2>Enter Score</h2>"+
-      "<p>The challenge has not been accepted yet.</p>"+
-      "<p class='muted'>Scores can only be entered after the challenged team accepts.</p>";
+      "<p>There is no accepted challenge ready for score entry.</p>";
+    return;
+  }
+
+  if(myTeam!==challenge.challenger && myTeam!==challenge.challenged){
+    c.innerHTML=
+      "<h2>Enter Score</h2>"+
+      "<p>This team is not part of the accepted challenge.</p>";
     return;
   }
 
   c.innerHTML=
     "<h2>Enter Score</h2>"+
-    "<div class='success'><b>Challenge accepted.</b></div>"+
-    "<p>You may now enter the match result.</p>"+
-    "<p class='muted'>The next step will add the actual game-score fields and opponent confirmation.</p>";
+    "<div class='notice'><b>"+challenge.challenger.name+
+    " vs. "+challenge.challenged.name+"</b><br>"+
+    "Best 2 of 3 games to 11, win by 2.</div>"+
+
+    "<table class='scoreTable'>"+
+    "<tr><th>Game</th><th>"+challenge.challenger.name+"</th><th>"+challenge.challenged.name+"</th></tr>"+
+
+    "<tr><td>Game 1</td>"+
+    "<td><input id='g1a' type='number' min='0'></td>"+
+    "<td><input id='g1b' type='number' min='0'></td></tr>"+
+
+    "<tr><td>Game 2</td>"+
+    "<td><input id='g2a' type='number' min='0'></td>"+
+    "<td><input id='g2b' type='number' min='0'></td></tr>"+
+
+    "<tr><td>Game 3</td>"+
+    "<td><input id='g3a' type='number' min='0' placeholder='If needed'></td>"+
+    "<td><input id='g3b' type='number' min='0' placeholder='If needed'></td></tr>"+
+    "</table>"+
+
+    "<p class='muted'>Game 3 is only required if the teams split the first two games.</p>"+
+    "<button onclick='submitResult()'>Submit Result</button>";
+}
+
+function validGame(a,b){
+
+  if(!Number.isInteger(a) || !Number.isInteger(b)) return false;
+  if(a<0 || b<0) return false;
+  if(a===b) return false;
+
+  const winner=Math.max(a,b);
+  const loser=Math.min(a,b);
+
+  if(winner<11) return false;
+  if(winner-loser<2) return false;
+
+  return true;
+}
+
+function submitResult(){
+
+  const g1a=parseInt(document.getElementById("g1a").value);
+  const g1b=parseInt(document.getElementById("g1b").value);
+  const g2a=parseInt(document.getElementById("g2a").value);
+  const g2b=parseInt(document.getElementById("g2b").value);
+
+  if(!validGame(g1a,g1b) || !validGame(g2a,g2b)){
+    alert("Please enter valid scores for Games 1 and 2. Each game must be won by at least 2 points.");
+    return;
+  }
+
+  let challengerGames=0;
+  let challengedGames=0;
+
+  if(g1a>g1b) challengerGames++;
+  else challengedGames++;
+
+  if(g2a>g2b) challengerGames++;
+  else challengedGames++;
+
+  let scores=[
+    [g1a,g1b],
+    [g2a,g2b]
+  ];
+
+  if(challengerGames===1 && challengedGames===1){
+
+    const g3a=parseInt(document.getElementById("g3a").value);
+    const g3b=parseInt(document.getElementById("g3b").value);
+
+    if(!validGame(g3a,g3b)){
+      alert("The teams split Games 1 and 2, so please enter a valid Game 3 score.");
+      return;
+    }
+
+    scores.push([g3a,g3b]);
+
+    if(g3a>g3b) challengerGames++;
+    else challengedGames++;
+  }
+
+  challenge.scores=scores;
+  challenge.winner=
+    challengerGames>challengedGames
+      ? challenge.challenger
+      : challenge.challenged;
+
+  challenge.submittedBy=myTeam;
+  challenge.status="Awaiting Confirmation";
+
+  renderChallenges();
+}
+
+function scoreSummary(){
+
+  let html="<b>Submitted scores:</b><br>";
+
+  challenge.scores.forEach((score,i)=>{
+    html+="Game "+(i+1)+": "+
+      challenge.challenger.name+" "+score[0]+
+      " - "+score[1]+" "+challenge.challenged.name+"<br>";
+  });
+
+  html+="<br><b>Reported winner:</b> "+challenge.winner.name;
+
+  return html;
+}
+
+function confirmResult(){
+
+  updateRecordsAndLadder();
+  challenge.status="Completed";
+  renderChallenges();
+}
+
+function disputeResult(){
+  challenge.status="Disputed";
+  renderChallenges();
+}
+
+function resetResult(){
+  challenge.scores=null;
+  challenge.winner=null;
+  challenge.submittedBy=null;
+  challenge.status="Accepted";
+  show("score");
+}
+
+function updateRecordsAndLadder(){
+
+  const winner=challenge.winner;
+  const loser=
+    winner===challenge.challenger
+      ? challenge.challenged
+      : challenge.challenger;
+
+  winner.wins++;
+  loser.losses++;
+
+  if(winner===challenge.challenger){
+
+    const challengerIndex=teamIndex(challenge.challenger);
+    const challengedIndex=teamIndex(challenge.challenged);
+
+    const movingTeam=teams.splice(challengerIndex,1)[0];
+    teams.splice(challengedIndex,0,movingTeam);
+  }
 }
 
 show("board");
