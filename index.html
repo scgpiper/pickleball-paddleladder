@@ -149,6 +149,7 @@ select{
   <button onclick="show('challenge')">⚔️ My Challenges</button>
   <button onclick="show('score')">✍️ Enter Score</button>
   <button onclick="show('rules')">❓ Rules / Help</button>
+  <button onclick="show('partners')">🤝 Partner Connect</button>
 </div>
 
 <div id="content" class="card"></div>
@@ -183,6 +184,7 @@ function show(page){
   if(page==="board") renderBoard();
   if(page==="challenge") renderChallenges();
   if(page==="score") renderScore();
+  if(page==="partners") renderPartners();
 
   if(page==="rules"){
     document.getElementById("content").innerHTML=
@@ -643,7 +645,38 @@ function updateRecordsAndLadder(){
     teams.splice(challengedIndex,0,movingTeam);
   }
 }
+function renderPartners(){
+  const c = document.getElementById("content");
 
+  c.innerHTML =
+    "<h2>🤝 Partner Connect</h2>" +
+    "<p>Need a partner? Find players who are looking to form a team.</p>" +
+
+    "<div class='info'>" +
+      "<b>Which ladder are you interested in?</b><br><br>" +
+
+      "<select id='partnerLadder' style='width:100%;padding:12px;font-size:16px;'>" +
+        "<option value='mens'>Men's Ladder</option>" +
+        "<option value='womens'>Women's Ladder</option>" +
+        "<option value='mixed'>Mixed Ladder</option>" +
+      "</select>" +
+    "</div>" +
+
+    "<br>" +
+
+    "<h3>Players Looking for Partners</h3>" +
+
+    "<div class='warning'>" +
+      "<b>Partner listings will appear here.</b><br><br>" +
+      "Players will be able to list their name, gender, DUPR and availability." +
+    "</div>" +
+
+    "<br>" +
+
+    "<button onclick='alert(\"Player registration will be added next.\")'>" +
+      "➕ List Me as Looking for a Partner" +
+    "</button>";
+}
 show("board");
 
 </script>
