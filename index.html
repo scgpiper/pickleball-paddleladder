@@ -670,7 +670,7 @@ function renderPartners(){
 
 (partnerListings.length === 0
   ? "<div class='warning'><b>No players are currently looking for a partner.</b></div>"
-partnerListings.map(function(player,index){
+: partnerListings.map(function(player,index){
   return "<div class='success'>" +
     "<b>" + player.name + "</b><br>" +
     "Gender: " + player.gender + "<br>" +
