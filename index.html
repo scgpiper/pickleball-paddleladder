@@ -686,22 +686,7 @@ partnerListings.map(function(player,index){
 
     "<br>" +
 
-   "<h3>Pending Partner Invites</h3>" +
 
-(partnerInvites.length === 0
-  ? "<div class='warning'>No pending partner invites.</div>"
-  : partnerInvites.map(function(invite,index){
-      return "<div class='success'>" +
-        "<b>From:</b> " + invite.from + "<br>" +
-        "<b>To:</b> " + invite.to + "<br>" +
-        "<b>Status:</b> " + invite.status + "<br><br>" +
-        "<button class='smallBtn' onclick='acceptPartnerInvite(" + index + ")'>Accept</button> " +
-        "<button class='smallBtn' onclick='declinePartnerInvite(" + index + ")'>Decline</button>" +
-      "</div><br>";
-    }).join("")
-) +
-
-"<br>" +
     
     "<button onclick='renderPartnerForm()'>" +
       "➕ List Me as Looking for a Partner" +
