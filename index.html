@@ -173,7 +173,8 @@ let teams = [
 ];
 
 let myTeam = null;
- let partnerListings = []; 
+ let partnerListings = [];
+  let partnerInvites = [];
 let challenge = null;
 
 function teamIndex(team){
@@ -669,18 +670,39 @@ function renderPartners(){
 
 (partnerListings.length === 0
   ? "<div class='warning'><b>No players are currently looking for a partner.</b></div>"
-  : partnerListings.map(function(player){
-      return "<div class='success'>" +
-        "<b>" + player.name + "</b><br>" +
-        "Gender: " + player.gender + "<br>" +
-        "DUPR: " + player.dupr + "<br>" +
-        "Availability: " + player.availability +
-      "</div><br>";
-    }).join("")
+partnerListings.map(function(player,index){
+  return "<div class='success'>" +
+    "<b>" + player.name + "</b><br>" +
+    "Gender: " + player.gender + "<br>" +
+    "DUPR: " + player.dupr + "<br>" +
+    "Looking for: " + player.ladder + "<br>" +
+    "Availability: " + player.availability + "<br><br>" +
+    "<button class='smallBtn' onclick='sendPartnerInvite(" + index + ")'>" +
+      "🤝 Invite as Partner" +
+    "</button>" +
+  "</div><br>";
+}).join("")
 ) +
 
     "<br>" +
 
+   "<h3>Pending Partner Invites</h3>" +
+
+(partnerInvites.length === 0
+  ? "<div class='warning'>No pending partner invites.</div>"
+  : partnerInvites.map(function(invite,index){
+      return "<div class='success'>" +
+        "<b>From:</b> " + invite.from + "<br>" +
+        "<b>To:</b> " + invite.to + "<br>" +
+        "<b>Status:</b> " + invite.status + "<br><br>" +
+        "<button class='smallBtn' onclick='acceptPartnerInvite(" + index + ")'>Accept</button> " +
+        "<button class='smallBtn' onclick='declinePartnerInvite(" + index + ")'>Decline</button>" +
+      "</div><br>";
+    }).join("")
+) +
+
+"<br>" +
+    
     "<button onclick='renderPartnerForm()'>" +
       "➕ List Me as Looking for a Partner" +
     "</button>";
@@ -742,6 +764,67 @@ function renderPartnerForm(){
 
   renderPartners();
 }
+function sendPartnerInvite(index){
+  const player = partnerListings[index];
+
+  if(!player){
+    alert("Player not found.");
+    return;
+  }
+
+  const senderName = prompt("Enter your name to send this partner invite:");
+
+  if(senderName === null) return;
+
+  if(senderName.trim() === ""){
+    alert("Please enter your name.");
+    return;
+  }
+
+  partnerInvites.push({
+    from: senderName.trim(),
+    to: player.name,
+    status: "Pending"
+  });
+
+  alert("Partner invite sent to " + player.name + ".");
+
+  renderPartners();
+}
+function acceptPartnerInvite(index){
+  const invite = partnerInvites[index];
+
+  if(!invite){
+    alert("Invite not found.");
+    return;
+  }
+
+  invite.status = "Accepted";
+
+  alert(
+    invite.to + " accepted the partner invite from " + invite.from + "."
+  );
+
+  renderPartners();
+}
+
+function declinePartnerInvite(index){
+  const invite = partnerInvites[index];
+
+  if(!invite){
+    alert("Invite not found.");
+    return;
+  }
+
+  invite.status = "Declined";
+
+  alert(
+    invite.to + " declined the partner invite from " + invite.from + "."
+  );
+
+  renderPartners();
+}
+  
 show("board");
 
 </script>
