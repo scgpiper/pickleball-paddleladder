@@ -691,7 +691,8 @@ function renderPartners(){
 (
  partnerInvites.filter(function(invite){ return invite.status === "Pending"; }).length === 0
   ? "<div class='warning'><b>No pending partner invites.</b></div>"
-  : partnerInvites.filter(function(invite){ return invite.status === "Pending"; }).map(function(invite,index){
+  : partnerInvites.map(function(invite,index){
+  if(invite.status !== "Pending") return "";
       return "<div class='success'>" +
         "<b>From:</b> " + invite.from + "<br>" +
         "<b>To:</b> " + invite.to + "<br>" +
