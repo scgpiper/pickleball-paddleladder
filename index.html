@@ -171,9 +171,36 @@ let teams = [
   {name:"Drop Shots",players:"Quinn / Roberts",dupr:7.80,wins:3,losses:4},
   {name:"The Challengers",players:"Underwood / Vance",dupr:7.56,wins:5,losses:2}
 ];
+function placeNewTeamByDupr(){
+  const newTeam = createdTeams[createdTeams.length - 1];
 
+  if(!newTeam) return;
+
+  // NR teams always enter at the bottom
+  if(newTeam.isNR){
+    teams.push(newTeam);
+    return;
+  }
+
+  const newDupr = parseFloat(newTeam.dupr);
+  let insertIndex = teams.length;
+
+  // Position 11 is index 10.
+  // A new team's DUPR can never place it inside the Top 10.
+  for(let i = 10; i < teams.length; i++){
+    const existingDupr = parseFloat(teams[i].dupr);
+
+    if(!isNaN(existingDupr) && newDupr > existingDupr){
+      insertIndex = i;
+      break;
+    }
+  }
+
+  teams.splice(insertIndex, 0, newTeam);
+}
 let myTeam = null;
  let partnerListings = [];
+  let createdTeams = [];
   let partnerInvites = [];
 let challenge = null;
 
@@ -780,19 +807,32 @@ function sendPartnerInvite(index){
   }
 
   const senderName = prompt("Enter your name to send this partner invite:");
+const senderGender = prompt("Enter your gender: Male or Female");
+if(senderGender === null) return;
+  
 
-  if(senderName === null) return;
+const senderDupr = prompt("Enter your DUPR, or type NR if you are not rated:");
+if(senderDupr === null) return;
+
+if(senderName === null) return;
+
+
 
   if(senderName.trim() === ""){
     alert("Please enter your name.");
     return;
   }
 
-  partnerInvites.push({
-    from: senderName.trim(),
-    to: player.name,
-    status: "Pending"
-  });
+partnerInvites.push({
+  from: senderName.trim(),
+  fromDupr: senderDupr.trim(),
+  fromGender: senderGender.trim(),
+  to: player.name,
+  toGender: player.gender,
+  toDupr: player.dupr,
+  ladder: player.ladder,
+  status: "Pending"
+});
 
   alert("Partner invite sent to " + player.name + ".");
 
@@ -807,6 +847,26 @@ function acceptPartnerInvite(index){
   }
 
   invite.status = "Accepted";
+  const senderIsNR = invite.fromDupr.toUpperCase() === "NR";
+const partnerIsNR = String(invite.toDupr).toUpperCase() === "NR";
+const teamIsNR = senderIsNR || partnerIsNR;
+
+const combinedDupr = teamIsNR
+  ? "NR"
+  : (parseFloat(invite.fromDupr) + parseFloat(invite.toDupr)).toFixed(2);
+
+createdTeams.push({
+  name: invite.from + " / " + invite.to,
+  players: invite.from + " / " + invite.to,
+  player1Gender: invite.fromGender,
+player2Gender: invite.toGender,
+  ladder: invite.ladder,
+  dupr: combinedDupr,
+  isNR: teamIsNR,
+  wins: 0,
+  losses: 0
+});
+  placeNewTeamByDupr();
 partnerListings = partnerListings.filter(function(player){
   return player.name !== invite.to;
 });
