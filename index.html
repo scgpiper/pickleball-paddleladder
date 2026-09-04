@@ -806,6 +806,10 @@ function acceptPartnerInvite(index){
   }
 
   invite.status = "Accepted";
+partnerListings = partnerListings.filter(function(player){
+  return player.name !== invite.to;
+});
+  
 
   alert(
     invite.to + " accepted the partner invite from " + invite.from + "."
