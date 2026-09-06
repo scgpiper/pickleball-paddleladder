@@ -219,7 +219,7 @@ function show(page){
     document.getElementById("content").innerHTML=
       "<h2>Rules / Help</h2>"+
       "<p><b>Challenge:</b> A team may challenge up to 3 positions above.</p>"+
-      "<p><b>Match:</b> Best 2 of 3 games to 11, win by 2.</p>"+
+      "<p><b>Match:</b> Best 3 of 5 games to 11, win by 2.</p>"+
       "<p><b>Challenger wins:</b> Challenger takes the challenged team's position. Teams between them move down one position.</p>"+
       "<p><b>Challenged team wins:</b> Ladder positions do not change.</p>"+
       "<p><b>Results:</b> The opposing team must confirm the submitted result before standings change.</p>"+
@@ -528,7 +528,7 @@ function renderScore(){
     "<h2>Enter Score</h2>"+
     "<div class='notice'><b>"+challenge.challenger.name+
     " vs. "+challenge.challenged.name+"</b><br>"+
-    "Best 2 of 3 games to 11, win by 2.</div>"+
+    "Best 3 of 5 games to 11, win by 2.</div>"+
 
     "<table class='scoreTable'>"+
     "<tr><th>Game</th><th>"+challenge.challenger.name+"</th><th>"+challenge.challenged.name+"</th></tr>"+
@@ -541,13 +541,21 @@ function renderScore(){
     "<td><input id='g2a' type='number' min='0'></td>"+
     "<td><input id='g2b' type='number' min='0'></td></tr>"+
 
-    "<tr><td>Game 3</td>"+
-    "<td><input id='g3a' type='number' min='0' placeholder='If needed'></td>"+
-    "<td><input id='g3b' type='number' min='0' placeholder='If needed'></td></tr>"+
-    "</table>"+
+"<tr><td>Game 3</td>"+
+"<td><input id='g3a' type='number' min='0'></td>"+
+"<td><input id='g3b' type='number' min='0'></td></tr>"+
 
-    "<p class='muted'>Game 3 is only required if the teams split the first two games.</p>"+
-    "<button onclick='submitResult()'>Submit Result</button>";
+"<tr><td>Game 4</td>"+
+"<td><input id='g4a' type='number' min='0' placeholder='If needed'></td>"+
+"<td><input id='g4b' type='number' min='0' placeholder='If needed'></td></tr>"+
+
+"<tr><td>Game 5</td>"+
+"<td><input id='g5a' type='number' min='0' placeholder='If needed'></td>"+
+"<td><input id='g5b' type='number' min='0' placeholder='If needed'></td></tr>"+
+"</table>"+
+
+"<p class='muted'>Games 1, 2 and 3 are required. Game 4 is required if neither team has won 3 games. Game 5 is required if the match is tied 2-2 after four games.</p>"+
+"<button onclick='submitResult()'>Submit Result</button>";
 }
 
 function validGame(a,b){
@@ -571,14 +579,22 @@ function submitResult(){
   const g1b=parseInt(document.getElementById("g1b").value);
   const g2a=parseInt(document.getElementById("g2a").value);
   const g2b=parseInt(document.getElementById("g2b").value);
+  const g3a=parseInt(document.getElementById("g3a").value);
+  const g3b=parseInt(document.getElementById("g3b").value);
 
-  if(!validGame(g1a,g1b) || !validGame(g2a,g2b)){
-    alert("Please enter valid scores for Games 1 and 2. Each game must be won by at least 2 points.");
+  if(!validGame(g1a,g1b) || !validGame(g2a,g2b) || !validGame(g3a,g3b)){
+    alert("Please enter valid scores for Games 1, 2 and 3. Each game must be played to at least 11 and won by 2.");
     return;
   }
 
   let challengerGames=0;
   let challengedGames=0;
+
+  const scores=[
+    [g1a,g1b],
+    [g2a,g2b],
+    [g3a,g3b]
+  ];
 
   if(g1a>g1b) challengerGames++;
   else challengedGames++;
@@ -586,28 +602,43 @@ function submitResult(){
   if(g2a>g2b) challengerGames++;
   else challengedGames++;
 
-  let scores=[
-    [g1a,g1b],
-    [g2a,g2b]
-  ];
+  if(g3a>g3b) challengerGames++;
+  else challengedGames++;
 
-  if(challengerGames===1 && challengedGames===1){
+  if(challengerGames<3 && challengedGames<3){
 
-    const g3a=parseInt(document.getElementById("g3a").value);
-    const g3b=parseInt(document.getElementById("g3b").value);
+    const g4a=parseInt(document.getElementById("g4a").value);
+    const g4b=parseInt(document.getElementById("g4b").value);
 
-    if(!validGame(g3a,g3b)){
-      alert("The teams split Games 1 and 2, so please enter a valid Game 3 score.");
+    if(!validGame(g4a,g4b)){
+      alert("Game 4 is required because neither team has won 3 games.");
       return;
     }
 
-    scores.push([g3a,g3b]);
+    scores.push([g4a,g4b]);
 
-    if(g3a>g3b) challengerGames++;
+    if(g4a>g4b) challengerGames++;
+    else challengedGames++;
+  }
+
+  if(challengerGames<3 && challengedGames<3){
+
+    const g5a=parseInt(document.getElementById("g5a").value);
+    const g5b=parseInt(document.getElementById("g5b").value);
+
+    if(!validGame(g5a,g5b)){
+      alert("Game 5 is required because the match is tied 2-2.");
+      return;
+    }
+
+    scores.push([g5a,g5b]);
+
+    if(g5a>g5b) challengerGames++;
     else challengedGames++;
   }
 
   challenge.scores=scores;
+
   challenge.winner=
     challengerGames>challengedGames
       ? challenge.challenger
