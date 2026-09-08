@@ -837,11 +837,9 @@ function sendPartnerInvite(index){
   }
 
   const senderName = prompt("Enter your name to send this partner invite:");
-const senderGender = prompt("Enter your gender: Male or Female");
+  const senderGender = prompt("Enter your gender: Male or Female");
 if(senderGender === null) return;
-  
-
-const senderDupr = prompt("Enter your DUPR, or type NR if you are not rated:");
+const senderDupr = prompt("Enter your DUPR, or type NR if you are not rated");
 if(senderDupr === null) return;
 
 if(senderName === null) return;
