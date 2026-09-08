@@ -882,9 +882,13 @@ const teamIsNR = senderIsNR || partnerIsNR;
 const combinedDupr = teamIsNR
   ? "NR"
   : (parseFloat(invite.fromDupr) + parseFloat(invite.toDupr)).toFixed(2);
-
+const teamName = prompt("Enter your team name:");
+if(teamName === null || teamName.trim() === ""){
+    alert("Please enter a team name.");
+    return;
+}
 createdTeams.push({
-  name: invite.from + " / " + invite.to,
+name: teamName.trim(),
   players: invite.from + " / " + invite.to,
   player1Gender: invite.fromGender,
 player2Gender: invite.toGender,
