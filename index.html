@@ -281,7 +281,7 @@ function renderBoard(){
       "<tr class='"+(i<10?"top10 ":"")+(mine?"myteam":"")+"'>"+
       "<td><b>#"+(i+1)+"</b></td>"+
       "<td><b>"+team.name+"</b><div class='muted'>"+team.players+"</div></td>"+
-      "<td>"+team.dupr.toFixed(2)+"</td>"+
+      "<td>"+(team.isNR ? "NR" : Number(team.dupr).toFixed(2))+"</td>"+
       "<td>"+team.wins+"-"+team.losses+"</td>"+
       "<td>";
 
@@ -899,7 +899,7 @@ player2Gender: invite.toGender,
 });
   placeNewTeamByDupr();
 partnerListings = partnerListings.filter(function(player){
-  return player.name !== invite.to;
+    return player.name !== invite.to && player.name !== invite.from;
 });
   
 
@@ -907,7 +907,7 @@ partnerListings = partnerListings.filter(function(player){
     invite.to + " accepted the partner invite from " + invite.from + "."
   );
 
-  renderPartners();
+  renderBoard();
 }
 
 function declinePartnerInvite(index){
