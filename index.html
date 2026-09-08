@@ -734,7 +734,7 @@ function renderPartners(){
     "Gender: " + player.gender + "<br>" +
     "DUPR: " + player.dupr + "<br>" +
     "Looking for: " + player.ladder + "<br>" +
-    "Availability: " + player.availability + "<br><br>" +
+    
     "<button class='smallBtn' onclick='sendPartnerInvite(" + index + ")'>" +
       "🤝 Invite as Partner" +
     "</button>" +
@@ -800,8 +800,7 @@ function renderPartnerForm(){
       "<option value='mixed'>Mixed Ladder</option>" +
     "</select></p>" +
 
-    "<p><b>Availability</b><br>" +
-    "<input id='partnerAvailability' placeholder='Example: Weekday mornings' style='width:100%;padding:10px;'></p>" +
+    
 
     "<button onclick='savePartnerListing()'>Add Me to Partner Connect</button> " +
     "<button onclick='renderPartners()'>Cancel</button>";
@@ -812,19 +811,19 @@ function renderPartnerForm(){
   const gender = document.getElementById("partnerGender").value;
   const dupr = document.getElementById("partnerDupr").value;
   const ladder = document.getElementById("partnerLadder").value;
-  const availability = document.getElementById("partnerAvailability").value.trim();
+  
 
-  if(!name || !dupr || !availability){
-    alert("Please complete your name, DUPR and availability.");
-    return;
-  }
+  if(!name || !dupr){
+  alert("Please complete your name and DUPR.");
+  return;
+}
 
   partnerListings.push({
     name: name,
     gender: gender,
     dupr: dupr,
-    ladder: ladder,
-    availability: availability
+   ladder: ladder
+    
   });
 
   renderPartners();
