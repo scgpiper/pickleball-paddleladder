@@ -171,6 +171,7 @@ let teams = [
   {name:"Drop Shots",players:"Quinn / Roberts",dupr:7.80,wins:3,losses:4},
   {name:"The Challengers",players:"Underwood / Vance",dupr:7.56,wins:5,losses:2}
 ];
+  let matchHistory=[];
 function placeNewTeamByDupr(){
   const newTeam = createdTeams[createdTeams.length - 1];
 
@@ -587,8 +588,9 @@ function submitResult(){
     return;
   }
 
-  let challengerGames=0;
-  let challengedGames=0;
+let challengerGames=0;
+let challengedGames=0;
+
 
   const scores=[
     [g1a,g1b],
@@ -669,6 +671,7 @@ function confirmResult(){
 
   updateRecordsAndLadder();
   challenge.status="Completed";
+  challenge.completedAt = Date.now();
   renderChallenges();
 }
 
