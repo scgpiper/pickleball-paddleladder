@@ -672,6 +672,11 @@ function confirmResult(){
   updateRecordsAndLadder();
   challenge.status="Completed";
   challenge.completedAt = Date.now();
+  matchHistory.push({
+    teamA: challenge.challenger.name,
+    teamB: challenge.challenged.name,
+    completedAt: challenge.completedAt
+});
   renderChallenges();
 }
 
