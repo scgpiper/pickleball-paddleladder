@@ -278,6 +278,16 @@ function renderBoard(){
       challenge &&
       ["Pending","Accepted","Awaiting Confirmation"].includes(challenge.status);
 
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+
+const rematchLocked = matchHistory.some(match => {
+    const samePair =
+        (match.teamA === myTeam.name && match.teamB === team.name) ||
+        (match.teamA === team.name && match.teamB === myTeam.name);
+
+    return samePair && (Date.now() - match.completedAt < sevenDays);
+});
+
     html+=
       "<tr class='"+(i<10?"top10 ":"")+(mine?"myteam":"")+"'>"+
       "<td><b>#"+(i+1)+"</b></td>"+
@@ -286,7 +296,7 @@ function renderBoard(){
       "<td>"+team.wins+"-"+team.losses+"</td>"+
       "<td>";
 
-    if(eligible && !challengeBusy){
+    if(eligible && !challengeBusy && !rematchLocked){
       html+=
         "<button class='challengeBtn' onclick='issueChallenge("+i+")'>Challenge</button>";
     }else if(mine){
