@@ -354,7 +354,15 @@ function selectTeam(value){
 function issueChallenge(opponentIndex){
 
   if(!myTeam) return;
+const unansweredIncoming = pendingChallenges.some(item =>
+  item.challenged === myTeam &&
+  item.status === "Pending"
+);
 
+if(unansweredIncoming){
+  alert("You must respond to all incoming challenges before issuing a new challenge.");
+  return;
+}
   const myIndex=teamIndex(myTeam);
   const distance=myIndex-opponentIndex;
 
