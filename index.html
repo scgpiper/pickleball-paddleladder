@@ -427,11 +427,17 @@ const teamChallenges = pendingChallenges.filter(item =>
       "<p>Please select your team from the Leaderboard first.</p>";
     return;
   }
+  const confirmationChallenge = teamChallenges.find(item =>
+  item.status === "Awaiting Confirmation" &&
+  item.challenged === myTeam
+);
 const incomingChallenges = teamChallenges
   .filter(item => item.challenged===myTeam && item.status==="Pending")
   .sort((a,b) => teamIndex(a.challenger) - teamIndex(b.challenger));
 
-if(incomingChallenges.length){
+if(confirmationChallenge){
+  challenge = confirmationChallenge;
+}else if(incomingChallenges.length){
   challenge = incomingChallenges[0];
 }else if(teamChallenges.length){
   challenge = teamChallenges[0];
