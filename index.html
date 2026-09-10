@@ -364,7 +364,12 @@ function issueChallenge(opponentIndex){
     scores:null,
     winner:null
   };
-
+challengeHistory.push({
+  challenger: myTeam.name,
+  challenged: teams[opponentIndex].name,
+  status: "Pending",
+  createdAt: Date.now()
+});
   renderChallenges();
 }
 
