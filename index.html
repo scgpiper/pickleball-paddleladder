@@ -174,6 +174,9 @@ let teams = [
 ];
   let matchHistory=[];
   let challengeHistory=[];
+  let matchHistory=[];
+let challengeHistory=[];
+let pendingChallenges=[];
 function placeNewTeamByDupr(){
   const newTeam = createdTeams[createdTeams.length - 1];
 
@@ -277,9 +280,10 @@ function renderBoard(){
 
     const mine=team===myTeam;
 
-    const challengeBusy =
-      challenge &&
-      ["Pending","Accepted","Awaiting Confirmation"].includes(challenge.status);
+   const challengeBusy = pendingChallenges.some(item =>
+  item.challenger === myTeam &&
+  ["Pending","Accepted","Awaiting Confirmation"].includes(item.status)
+);
 
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
 
@@ -368,6 +372,7 @@ function issueChallenge(opponentIndex){
     scores:null,
     winner:null
   };
+  pendingChallenges.push(challenge);
 challengeHistory.push({
   challenger: myTeam.name,
   challenged: teams[opponentIndex].name,
@@ -380,14 +385,27 @@ challengeHistory.push({
 function renderChallenges(){
 
   const c=document.getElementById("content");
-
+const teamChallenges = pendingChallenges.filter(item =>
+  (item.challenger===myTeam || item.challenged===myTeam) &&
+  ["Pending","Accepted","Awaiting Confirmation"].includes(item.status)
+);
   if(!myTeam){
     c.innerHTML=
       "<h2>My Challenges</h2>"+
       "<p>Please select your team from the Leaderboard first.</p>";
     return;
   }
+const incomingChallenges = teamChallenges
+  .filter(item => item.challenged===myTeam && item.status==="Pending")
+  .sort((a,b) => teamIndex(a.challenger) - teamIndex(b.challenger));
 
+if(incomingChallenges.length){
+  challenge = incomingChallenges[0];
+}else if(teamChallenges.length){
+  challenge = teamChallenges[0];
+}else{
+  challenge = null;
+}
   if(!challenge){
     c.innerHTML=
       "<h2>My Challenges</h2>"+
@@ -503,6 +521,16 @@ function renderChallenges(){
 }
 
 function acceptChallenge(){
+  const priorityChallenge = pendingChallenges
+  .filter(item => item.challenged === myTeam && item.status === "Pending")
+  .sort((a,b) => teamIndex(a.challenger) - teamIndex(b.challenger))[0];
+
+if(priorityChallenge && challenge !== priorityChallenge){
+  alert("You must respond to the highest-ranked challenger first.");
+  challenge = priorityChallenge;
+  renderChallenges();
+  return;
+}
   challenge.status="Accepted";
   const historyItem=challengeHistory.findLast(item =>
   item.challenger===challenge.challenger.name &&
@@ -514,6 +542,16 @@ if(historyItem) historyItem.status="Accepted";
 }
 
 function declineChallenge(){
+  const priorityChallenge = pendingChallenges
+  .filter(item => item.challenged === myTeam && item.status === "Pending")
+  .sort((a,b) => teamIndex(a.challenger) - teamIndex(b.challenger))[0];
+
+if(priorityChallenge && challenge !== priorityChallenge){
+  alert("You must respond to the highest-ranked challenger first.");
+  challenge = priorityChallenge;
+  renderChallenges();
+  return;
+}
     const reason = prompt(
         "Why are you declining this challenge?\n\n" +
         "1 - Scheduling conflict\n" +
