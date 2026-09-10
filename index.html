@@ -397,7 +397,7 @@ function expireOldChallenges(){
     if(
       item.status === "Pending" &&
       item.createdAt &&
-      now - item.createdAt >= 10 * 60 * 1000
+      now - item.createdAt >= 72 * 60 * 60 * 1000
     ){
       item.status = "Expired";
 
