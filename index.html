@@ -377,7 +377,8 @@ if(unansweredIncoming){
     status:"Pending",
     submittedBy:null,
     scores:null,
-    winner:null
+    winner:null,
+createdAt:Date.now()
   };
   pendingChallenges.push(challenge);
 challengeHistory.push({
@@ -388,9 +389,33 @@ challengeHistory.push({
 });
   renderChallenges();
 }
+function expireOldChallenges(){
 
+  const now = Date.now();
+
+  pendingChallenges.forEach(item => {
+    if(
+      item.status === "Pending" &&
+      item.createdAt &&
+      now - item.createdAt >= 72 * 60 * 60 * 1000
+    ){
+      item.status = "Expired";
+
+      const historyItem = challengeHistory.findLast(history =>
+        history.challenger === item.challenger.name &&
+        history.challenged === item.challenged.name &&
+        history.status === "Pending"
+      );
+
+      if(historyItem){
+        historyItem.status = "Expired";
+        historyItem.expiredAt = now;
+      }
+    }
+  });
+}
 function renderChallenges(){
-
+expireOldChallenges();
   const c=document.getElementById("content");
 const teamChallenges = pendingChallenges.filter(item =>
   (item.challenger===myTeam || item.challenged===myTeam) &&
