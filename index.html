@@ -766,6 +766,16 @@ function confirmResult(){
   updateRecordsAndLadder();
   challenge.status="Completed";
   challenge.completedAt = Date.now();
+  const historyItem = challengeHistory.findLast(item =>
+  item.challenger === challenge.challenger.name &&
+  item.challenged === challenge.challenged.name &&
+  item.status === "Accepted"
+);
+
+if(historyItem){
+  historyItem.status = "Completed";
+  historyItem.completedAt = challenge.completedAt;
+}
   matchHistory.push({
     teamA: challenge.challenger.name,
     teamB: challenge.challenged.name,
