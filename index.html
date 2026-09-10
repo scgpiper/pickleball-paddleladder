@@ -500,6 +500,12 @@ function renderChallenges(){
 
 function acceptChallenge(){
   challenge.status="Accepted";
+  const historyItem=challengeHistory.findLast(item =>
+  item.challenger===challenge.challenger.name &&
+  item.challenged===challenge.challenged.name &&
+  item.status==="Pending"
+);
+if(historyItem) historyItem.status="Accepted";
   renderChallenges();
 }
 
@@ -531,6 +537,16 @@ function declineChallenge(){
 
     challenge.status = "Declined";
     challenge.declineReason = declineReason;
+  const historyItem=challengeHistory.findLast(item =>
+  item.challenger===challenge.challenger.name &&
+  item.challenged===challenge.challenged.name &&
+  item.status==="Pending"
+);
+
+if(historyItem){
+  historyItem.status="Declined";
+  historyItem.declineReason=declineReason;
+}
     renderChallenges();
 }
 
