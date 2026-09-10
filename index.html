@@ -217,6 +217,7 @@ function show(page){
   if(page==="challenge") renderChallenges();
   if(page==="score") renderScore();
   if(page==="partners") renderPartners();
+  if(page==="history") renderHistory();
 
   if(page==="rules"){
     document.getElementById("content").innerHTML=
@@ -312,7 +313,26 @@ const rematchLocked = matchHistory.some(match => {
 
   c.innerHTML=html;
 }
+function renderHistory(){
+  const c=document.getElementById("content");
 
+  if(!myTeam){
+    c.innerHTML=
+      "<h2>History / Stats</h2>"+
+      "<p>Please choose your team from the Leaderboard first.</p>";
+    return;
+  }
+
+  const rank=teamIndex(myTeam)+1;
+
+  c.innerHTML=
+    "<h2>📊 History / Stats</h2>"+
+    "<h3>"+myTeam.name+"</h3>"+
+    "<p><b>Current Rank:</b> #"+rank+"</p>"+
+    "<p><b>Record:</b> "+myTeam.wins+"-"+myTeam.losses+"</p>"+
+    "<p><b>Combined DUPR:</b> "+Number(myTeam.dupr).toFixed(2)+"</p>"+
+    "<p class='muted'>More challenge and match history will appear here as we add it.</p>";
+}
 function selectTeam(value){
 
   if(value===""){
