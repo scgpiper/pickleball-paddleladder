@@ -331,7 +331,11 @@ function renderHistory(){
     "<p><b>Current Rank:</b> #"+rank+"</p>"+
     "<p><b>Record:</b> "+myTeam.wins+"-"+myTeam.losses+"</p>"+
     "<p><b>Combined DUPR:</b> "+Number(myTeam.dupr).toFixed(2)+"</p>"+
-    "<p class='muted'>More challenge and match history will appear here as we add it.</p>";
+    "<h3>Challenge History</h3>"+
+challengeHistory
+  .filter(item => item.challenger===myTeam.name || item.challenged===myTeam.name)
+  .map(item => "<p><b>"+item.challenger+"</b> → <b>"+item.challenged+"</b><br>Status: "+item.status+(item.declineReason ? "<br>Reason: "+item.declineReason : "")+"</p>")
+  .join("");
 }
 function selectTeam(value){
 
