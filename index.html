@@ -278,6 +278,15 @@ function renderBoard(){
       i>=myIndex-3;
 
     const mine=team===myTeam;
+    const teamActiveMatch = pendingChallenges.find(item =>
+  ["Accepted","Awaiting Confirmation"].includes(item.status) &&
+  (item.challenger === team || item.challenged === team)
+);
+
+const teamPendingChallenge = pendingChallenges.find(item =>
+  item.status === "Pending" &&
+  item.challenged === team
+);
 
    const challengeBusy = pendingChallenges.some(item =>
   item.challenger === myTeam &&
@@ -302,12 +311,41 @@ const rematchLocked = matchHistory.some(match => {
       "<td>"+team.wins+"-"+team.losses+"</td>"+
       "<td>";
 
-    if(eligible && !challengeBusy && !rematchLocked){
-      html+=
-        "<button class='challengeBtn' onclick='issueChallenge("+i+")'>Challenge</button>";
-    }else if(mine){
-      html+="<span class='muted'>Your team</span>";
-    }
+if(teamActiveMatch){
+
+  const opponent =
+    teamActiveMatch.challenger === team
+      ? teamActiveMatch.challenged
+      : teamActiveMatch.challenger;
+
+  const playBy = teamActiveMatch.acceptedAt
+    ? new Date(teamActiveMatch.acceptedAt + sevenDays).toLocaleDateString()
+    : "Not set";
+
+  html +=
+    "<span class='muted'>🔒 <b>Match in Progress</b><br>"+
+    "vs. "+opponent.name+"<br>"+
+    "Play by: "+playBy+"</span>";
+
+}else if(teamPendingChallenge){
+
+  const responseBy = teamPendingChallenge.createdAt
+    ? new Date(teamPendingChallenge.createdAt + 72 * 60 * 60 * 1000).toLocaleDateString()
+    : "Not set";
+
+  html +=
+    "<span class='muted'>⏳ <b>Challenge Pending</b><br>"+
+    "Response by: "+responseBy+"</span>";
+
+}else if(eligible && !challengeBusy && !rematchLocked){
+
+  html +=
+    "<button class='challengeBtn' onclick='issueChallenge("+i+")'>Challenge</button>";
+
+}else if(mine){
+
+  html += "<span class='muted'>Your team</span>";
+}
 
     html+="</td></tr>";
   });
@@ -354,6 +392,27 @@ function selectTeam(value){
 function issueChallenge(opponentIndex){
 
   if(!myTeam) return;
+  const opponent = teams[opponentIndex];
+
+const opponentActiveMatch = pendingChallenges.find(item =>
+  ["Accepted","Awaiting Confirmation"].includes(item.status) &&
+  (item.challenger === opponent || item.challenged === opponent)
+);
+
+if(opponentActiveMatch){
+  alert("That team already has a match in progress. Please wait until that match is resolved.");
+  return;
+}
+
+const myActiveMatch = pendingChallenges.find(item =>
+  ["Accepted","Awaiting Confirmation"].includes(item.status) &&
+  (item.challenger === myTeam || item.challenged === myTeam)
+);
+
+if(myActiveMatch){
+  alert("Your team already has a match in progress. Please complete that match first.");
+  return;
+}
 const unansweredIncoming = pendingChallenges.some(item =>
   item.challenged === myTeam &&
   item.status === "Pending"
@@ -560,6 +619,22 @@ if(confirmationChallenge){
 }
 
 function acceptChallenge(){
+  const activeMatch = pendingChallenges.find(item =>
+  item !== challenge &&
+  ["Accepted","Awaiting Confirmation"].includes(item.status) &&
+  (item.challenger === myTeam || item.challenged === myTeam)
+);
+
+if(activeMatch){
+  alert(
+    "This team already has an accepted challenge in progress against " +
+    (activeMatch.challenger === myTeam
+      ? activeMatch.challenged.name
+      : activeMatch.challenger.name) +
+    ". Please complete that match first."
+  );
+  return;
+}
   const priorityChallenge = pendingChallenges
   .filter(item => item.challenged === myTeam && item.status === "Pending")
   .sort((a,b) => teamIndex(a.challenger) - teamIndex(b.challenger))[0];
@@ -571,6 +646,7 @@ if(priorityChallenge && challenge !== priorityChallenge){
   return;
 }
   challenge.status="Accepted";
+  challenge.acceptedAt = Date.now();
   const historyItem=challengeHistory.findLast(item =>
   item.challenger===challenge.challenger.name &&
   item.challenged===challenge.challenged.name &&
