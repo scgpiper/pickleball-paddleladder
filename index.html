@@ -425,6 +425,31 @@ challengeHistory
   .map(item => "<p><b>"+item.challenger+"</b> → <b>"+item.challenged+"</b><br>Status: "+item.status+(item.declineReason ? "<br>Reason: "+item.declineReason : "")+(item.cancelReason ? "<br>Reason: "+item.cancelReason : "")+"</p>")
   .join("");
 }
+  function renderAdminReview(){
+  const c=document.getElementById("content");
+
+  const reviews=pendingChallenges.filter(item =>
+    item.status==="Decline Pending Admin Review"
+  );
+
+  c.innerHTML="<h2>🛡️ Admin Review</h2>";
+
+  if(!reviews.length){
+    c.innerHTML+="<p>No declines waiting for admin review.</p>";
+    return;
+  }
+
+  reviews.forEach((item,index)=>{
+    c.innerHTML+=
+      "<div class='warning'>"+
+      "<b>"+item.challenger.name+" challenged "+item.challenged.name+"</b><br><br>"+
+      "<b>Decline reason:</b> "+item.declineReason+"<br><br>"+
+      "<b>Status:</b> Waiting for admin review.<br><br>"+
+"<button class='acceptBtn smallBtn' onclick='approveDecline("+index+")'>Approve Decline</button> "+
+"<button class='declineBtn smallBtn' onclick='rejectDecline("+index+")'>Reject Decline</button>"+
+      "</div>";
+  });
+}
 function selectTeam(value){
 
   if(value===""){
@@ -786,7 +811,33 @@ function approveDecline(item){
 
   renderChallenges();
 }
-  
+
+function rejectDecline(item){
+  const decliningTeam = item.challenged;
+  const decliningIndex = teamIndex(decliningTeam);
+
+  if(decliningIndex >= 0 && decliningIndex < teams.length - 1){
+    const teamBelow = teams[decliningIndex + 1];
+    teams[decliningIndex] = teamBelow;
+    teams[decliningIndex + 1] = decliningTeam;
+  }
+
+  item.status = "Declined - Penalty Applied";
+  item.declineReviewedAt = Date.now();
+
+  const historyItem = challengeHistory.findLast(history =>
+    history.challenger === item.challenger.name &&
+    history.challenged === item.challenged.name &&
+    history.status === "Decline Pending Admin Review"
+  );
+
+  if(historyItem){
+    historyItem.status = "Declined - Penalty Applied";
+    historyItem.declineReviewedAt = Date.now();
+  }
+
+  renderChallenges();
+}
 function cancelChallenge(){
 
   if(!challenge || challenge.status !== "Pending" || challenge.challenger !== myTeam){
