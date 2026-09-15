@@ -708,6 +708,7 @@ if(historyItem) historyItem.status="Accepted";
 }
 
 function declineChallenge(){
+  
   const priorityChallenge = pendingChallenges
   .filter(item => item.challenged === myTeam && item.status === "Pending")
   .sort((a,b) => teamIndex(a.challenger) - teamIndex(b.challenger))[0];
@@ -743,7 +744,7 @@ if(priorityChallenge && challenge !== priorityChallenge){
         return;
     }
 
-    challenge.status = "Declined";
+    challenge.status = "Decline Pending Admin Review";
     challenge.declineReason = declineReason;
   const historyItem=challengeHistory.findLast(item =>
   item.challenger===challenge.challenger.name &&
@@ -752,11 +753,29 @@ if(priorityChallenge && challenge !== priorityChallenge){
 );
 
 if(historyItem){
-  historyItem.status="Declined";
+historyItem.status="Decline Pending Admin Review";
   historyItem.declineReason=declineReason;
 }
     renderChallenges();
 }
+function approveDecline(item){
+  item.status = "Declined";
+  item.declineReviewedAt = Date.now();
+
+  const historyItem = challengeHistory.findLast(history =>
+    history.challenger === item.challenger.name &&
+    history.challenged === item.challenged.name &&
+    history.status === "Decline Pending Admin Review"
+  );
+
+  if(historyItem){
+    historyItem.status = "Declined";
+    historyItem.declineReviewedAt = Date.now();
+  }
+
+  renderChallenges();
+}
+  
 function cancelChallenge(){
 
   if(!challenge || challenge.status !== "Pending" || challenge.challenger !== myTeam){
