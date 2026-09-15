@@ -985,7 +985,7 @@ function updateRecordsAndLadder(){
     const challengedIndex = teamIndex(item.challenged);
     const distance = challengerIndex - challengedIndex;
 
-    if(distance < 1 || distance > 3){
+    if(distance < 1){
 
       item.status = "Cancelled";
       item.cancelledAt = now;
