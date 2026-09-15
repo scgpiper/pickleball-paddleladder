@@ -568,7 +568,18 @@ if(confirmationChallenge){
 
   const challengerRank=teamIndex(challenge.challenger)+1;
   const challengedRank=teamIndex(challenge.challenged)+1;
-
+if(challenge.status==="Decline Pending Admin Review"){
+  c.innerHTML=
+    "<h2>My Challenges</h2>"+
+    "<div class='warning'>"+
+    "<b>Decline Pending Admin Review</b><br><br>"+
+    "#"+challengerRank+" "+challenge.challenger.name+
+    " challenged #"+challengedRank+" "+challenge.challenged.name+
+    ".<br><br><b>Reason:</b> "+challenge.declineReason+
+    "<br><br><b>Status:</b> Waiting for admin review."+
+    "</div>";
+  return;
+}
   if(challenge.status==="Pending"){
 
     if(myTeam===challenge.challenger){
