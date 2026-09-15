@@ -526,7 +526,7 @@ expireOldChallenges();
   const c=document.getElementById("content");
 const teamChallenges = pendingChallenges.filter(item =>
   (item.challenger===myTeam || item.challenged===myTeam) &&
-  ["Pending","Accepted","Awaiting Confirmation"].includes(item.status)
+ ["Pending","Accepted","Awaiting Confirmation","Decline Pending Admin Review"].includes(item.status)
 );
   if(!myTeam){
     c.innerHTML=
