@@ -794,7 +794,10 @@ historyItem.status="Decline Pending Admin Review";
 }
     renderChallenges();
 }
-function approveDecline(item){
+function approveDecline(index){
+  const item = pendingChallenges.filter(item =>
+    item.status === "Decline Pending Admin Review"
+  )[index];
   item.status = "Declined";
   item.declineReviewedAt = Date.now();
 
@@ -812,7 +815,10 @@ function approveDecline(item){
   renderChallenges();
 }
 
-function rejectDecline(item){
+function rejectDecline(index){
+  const item = pendingChallenges.filter(item =>
+    item.status === "Decline Pending Admin Review"
+  )[index];
   const decliningTeam = item.challenged;
   const decliningIndex = teamIndex(decliningTeam);
 
