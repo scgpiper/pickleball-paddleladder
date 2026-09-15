@@ -374,7 +374,7 @@ function renderHistory(){
     "<h3>Challenge History</h3>"+
 challengeHistory
   .filter(item => item.challenger===myTeam.name || item.challenged===myTeam.name)
-  .map(item => "<p><b>"+item.challenger+"</b> → <b>"+item.challenged+"</b><br>Status: "+item.status+(item.declineReason ? "<br>Reason: "+item.declineReason : "")+"</p>")
+  .map(item => "<p><b>"+item.challenger+"</b> → <b>"+item.challenged+"</b><br>Status: "+item.status+(item.declineReason ? "<br>Reason: "+item.declineReason : "")+(item.cancelReason ? "<br>Reason: "+item.cancelReason : "")+"</p>")
   .join("");
 }
 function selectTeam(value){
@@ -905,7 +905,9 @@ function confirmResult(){
 
   updateRecordsAndLadder();
   challenge.status="Completed";
+  
   challenge.completedAt = Date.now();
+  cancelInvalidPendingChallenges();
   const historyItem = challengeHistory.findLast(item =>
   item.challenger === challenge.challenger.name &&
   item.challenged === challenge.challenged.name &&
@@ -968,6 +970,40 @@ function updateRecordsAndLadder(){
     const movingTeam=teams.splice(challengerIndex,1)[0];
     teams.splice(challengedIndex,0,movingTeam);
   }
+
+  cancelInvalidPendingChallenges();
+}
+  function cancelInvalidPendingChallenges(){
+
+  const now = Date.now();
+
+  pendingChallenges.forEach(item => {
+
+    if(item.status !== "Pending") return;
+
+    const challengerIndex = teamIndex(item.challenger);
+    const challengedIndex = teamIndex(item.challenged);
+    const distance = challengerIndex - challengedIndex;
+
+    if(distance < 1 || distance > 3){
+
+      item.status = "Cancelled";
+      item.cancelledAt = now;
+      item.cancelReason = "Ranking change";
+
+      const historyItem = challengeHistory.findLast(history =>
+        history.challenger === item.challenger.name &&
+        history.challenged === item.challenged.name &&
+        history.status === "Pending"
+      );
+
+      if(historyItem){
+        historyItem.status = "Cancelled";
+        historyItem.cancelledAt = now;
+        historyItem.cancelReason = "Ranking change";
+      }
+    }
+  });
 }
 function renderPartners(){
   const c = document.getElementById("content");
