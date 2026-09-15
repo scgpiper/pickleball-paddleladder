@@ -176,6 +176,54 @@ let teams = [
   let matchHistory=[];
 let challengeHistory=[];
 let pendingChallenges=[];
+  let acceptanceEnforcement={};
+  function recordAcceptanceRequirement(team){
+  if(!acceptanceEnforcement[team.name]){
+    acceptanceEnforcement[team.name]={
+      periodStartedAt: Date.now(),
+      acceptedInPeriod: false,
+      missedPeriods: 0
+    };
+  }
+}
+  function checkAcceptanceEnforcement(){
+  const now = Date.now();
+  const fourteenDays = 14 * 24 * 60 * 60 * 1000;
+
+  Object.keys(acceptanceEnforcement).forEach(teamName => {
+    const record = acceptanceEnforcement[teamName];
+
+    if(now - record.periodStartedAt < fourteenDays) return;
+
+    if(record.acceptedInPeriod){
+      delete acceptanceEnforcement[teamName];
+      return;
+    }
+
+    record.missedPeriods++;
+
+    const teamIndexNow = teams.findIndex(team => team.name === teamName);
+
+    if(teamIndexNow === -1){
+      delete acceptanceEnforcement[teamName];
+      return;
+    }
+
+    if(record.missedPeriods >= 4){
+      teams.splice(teamIndexNow,1);
+      delete acceptanceEnforcement[teamName];
+      return;
+    }
+
+    if(teamIndexNow < teams.length - 1){
+      const team = teams.splice(teamIndexNow,1)[0];
+      teams.splice(teamIndexNow + 1,0,team);
+    }
+
+    record.periodStartedAt = now;
+    record.acceptedInPeriod = false;
+  });
+}
 function placeNewTeamByDupr(){
   const newTeam = createdTeams[createdTeams.length - 1];
 
@@ -234,7 +282,7 @@ function show(page){
 }
 
 function renderBoard(){
-
+checkAcceptanceEnforcement();
   const c=document.getElementById("content");
 
   let options='<option value="">Choose your team...</option>';
@@ -439,6 +487,7 @@ if(unansweredIncoming){
 createdAt:Date.now()
   };
   pendingChallenges.push(challenge);
+  recordAcceptanceRequirement(challenge.challenged);
 challengeHistory.push({
   challenger: myTeam.name,
   challenged: teams[opponentIndex].name,
@@ -646,6 +695,9 @@ if(priorityChallenge && challenge !== priorityChallenge){
 }
   challenge.status="Accepted";
   challenge.acceptedAt = Date.now();
+  if(acceptanceEnforcement[challenge.challenged.name]){
+  acceptanceEnforcement[challenge.challenged.name].acceptedInPeriod = true;
+}
   const historyItem=challengeHistory.findLast(item =>
   item.challenger===challenge.challenger.name &&
   item.challenged===challenge.challenged.name &&
