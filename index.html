@@ -288,11 +288,10 @@ const teamPendingChallenge = pendingChallenges.find(item =>
   item.challenged === team
 );
 
-   const challengeBusy = pendingChallenges.some(item =>
-  item.challenger === myTeam &&
+const challengeBusy = pendingChallenges.some(item =>
+  (item.challenger === myTeam || item.challenged === myTeam) &&
   ["Pending","Accepted","Awaiting Confirmation"].includes(item.status)
 );
-
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
 
 const rematchLocked = matchHistory.some(match => {
