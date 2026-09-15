@@ -851,6 +851,18 @@ if(historyItem){
 
 function disputeResult(){
   challenge.status="Disputed";
+
+  const historyItem = challengeHistory.findLast(item =>
+    item.challenger === challenge.challenger.name &&
+    item.challenged === challenge.challenged.name &&
+    item.status === "Accepted"
+  );
+
+  if(historyItem){
+    historyItem.status = "Disputed";
+    historyItem.disputedAt = Date.now();
+  }
+
   renderChallenges();
 }
 
