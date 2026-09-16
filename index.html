@@ -303,9 +303,10 @@ checkAcceptanceEnforcement();
 
   const myIndex=myTeam ? teamIndex(myTeam) : -1;
 
-  if(myIndex>=0){
-    const first=Math.max(0,myIndex-3);
-    const last=myIndex-1;
+ if(myIndex>=0){
+  const maxChallengeDistance = myIndex <= 10 ? 2 : 3;
+  const first=Math.max(0,myIndex-maxChallengeDistance);
+  const last=myIndex-1;
 
     if(last>=first){
       html+=
@@ -322,10 +323,13 @@ checkAcceptanceEnforcement();
 
   teams.forEach((team,i)=>{
 
-    const eligible =
-      myIndex>=0 &&
-      i<myIndex &&
-      i>=myIndex-3;
+  const maxChallengeDistance =
+  (myIndex < 10 || i < 10) ? 2 : 3;
+
+const eligible =
+  myIndex >= 0 &&
+  i < myIndex &&
+  i >= myIndex - maxChallengeDistance;
 
     const mine=team===myTeam;
     const teamActiveMatch = pendingChallenges.find(item =>
@@ -496,13 +500,18 @@ if(unansweredIncoming){
   alert("You must respond to all incoming challenges before issuing a new challenge.");
   return;
 }
-  const myIndex=teamIndex(myTeam);
-  const distance=myIndex-opponentIndex;
+const myIndex=teamIndex(myTeam);
+const distance=myIndex-opponentIndex;
 
-  if(distance<1 || distance>3){
-    alert("That team is outside the 3-position challenge limit.");
-    return;
-  }
+// Top 10, or challenging into the Top 10 = maximum 2 positions.
+// Otherwise = maximum 3 positions.
+const maxChallengeDistance =
+  (myIndex < 10 || opponentIndex < 10) ? 2 : 3;
+
+if(distance < 1 || distance > maxChallengeDistance){
+  alert("That team is outside your challenge limit.");
+  return;
+}
 
   challenge={
     challenger:myTeam,
