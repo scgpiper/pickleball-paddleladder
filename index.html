@@ -1091,7 +1091,38 @@ function resetResult(){
   challenge.status="Accepted";
   show("score");
 }
+function cancelOutOfRangePendingChallenges(){
+  const now = Date.now();
 
+  pendingChallenges.forEach(item => {
+    if(item.status !== "Pending") return;
+
+    const challengerIndex = teamIndex(item.challenger);
+    const challengedIndex = teamIndex(item.challenged);
+
+    if(
+      challengerIndex === -1 ||
+      challengedIndex === -1 ||
+      challengerIndex <= challengedIndex ||
+      challengerIndex - challengedIndex > 3
+    ){
+      item.status = "Cancelled";
+
+      const historyItem = challengeHistory.findLast(history =>
+        history.challenger === item.challenger.name &&
+        history.challenged === item.challenged.name &&
+        history.status === "Pending"
+      );
+
+      if(historyItem){
+        historyItem.status = "Cancelled";
+        historyItem.cancelledAt = now;
+        historyItem.cancelReason =
+          "Ranking changed — challenge is no longer within 3 positions.";
+      }
+    }
+  });
+}
 function updateRecordsAndLadder(){
 
   const winner=challenge.winner;
