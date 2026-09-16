@@ -454,8 +454,9 @@ reviews.forEach((item,index)=>{
       "<div class='warning'>"+
       "<b>"+item.challenger.name+" vs. "+item.challenged.name+"</b><br><br>"+
       "<b>Reason:</b> Match was not completed within 7 days.<br><br>"+
-      "<b>Status:</b> Overdue — waiting for admin review.<br><br>"+
-      "</div>";
+     "<b>Status:</b> Overdue — waiting for admin review.<br><br>"+
+"<button class='acceptBtn smallBtn' onclick='extendOverdueMatch("+index+")'>Extend 7 Days</button>"+
+"</div>";
   }else{
     c.innerHTML+=
       "<div class='warning'>"+
@@ -467,6 +468,36 @@ reviews.forEach((item,index)=>{
       "</div>";
   }
 });
+}
+  function extendOverdueMatch(index){
+
+  const reviews = pendingChallenges.filter(item =>
+    item.status === "Decline Pending Admin Review" ||
+    item.status === "Overdue"
+  );
+
+  const item = reviews[index];
+
+  if(!item || item.status !== "Overdue"){
+    alert("This overdue match could not be found.");
+    return;
+  }
+
+  item.acceptedAt = Date.now();
+  item.status = "Accepted";
+
+  const historyItem = challengeHistory.findLast(history =>
+    history.challenger === item.challenger.name &&
+    history.challenged === item.challenged.name &&
+    history.status === "Overdue"
+  );
+
+  if(historyItem){
+    historyItem.status = "Accepted";
+    historyItem.extendedAt = Date.now();
+  }
+
+  renderAdminReview();
 }
 function selectTeam(value){
 
