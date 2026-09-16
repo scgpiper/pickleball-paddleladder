@@ -548,7 +548,40 @@ function expireOldChallenges(){
     }
   });
 }
-function renderChallenges(){
+function cancelOutOfRangePendingChallenges(){
+  const now = Date.now();
+
+  pendingChallenges.forEach(item => {
+    if(item.status !== "Pending") return;
+
+    const challengerRank = teamIndex(item.challenger);
+    const challengedRank = teamIndex(item.challenged);
+
+    if(
+      challengerRank === -1 ||
+      challengedRank === -1 ||
+      challengerRank <= challengedRank ||
+      challengerRank - challengedRank > 3
+    ){
+      item.status = "Cancelled";
+
+      const historyItem = challengeHistory.findLast(history =>
+        history.challenger === item.challenger.name &&
+        history.challenged === item.challenged.name &&
+        history.status === "Pending"
+      );
+
+      if(historyItem){
+        historyItem.status = "Cancelled";
+        historyItem.cancelledAt = now;
+        historyItem.cancelReason =
+          "Ranking changed — teams are no longer within challenge range.";
+      }
+    }
+  });
+}
+  
+  function renderChallenges(){
 expireOldChallenges();
   const c=document.getElementById("content");
 const teamChallenges = pendingChallenges.filter(item =>
@@ -1143,40 +1176,9 @@ function updateRecordsAndLadder(){
     teams.splice(challengedIndex,0,movingTeam);
   }
 
-  cancelInvalidPendingChallenges();
+ cancelOutOfRangePendingChallenges();
 }
-  function cancelInvalidPendingChallenges(){
-
-  const now = Date.now();
-
-  pendingChallenges.forEach(item => {
-
-    if(item.status !== "Pending") return;
-
-    const challengerIndex = teamIndex(item.challenger);
-    const challengedIndex = teamIndex(item.challenged);
-    const distance = challengerIndex - challengedIndex;
-
-    if(distance < 1){
-
-      item.status = "Cancelled";
-      item.cancelledAt = now;
-      item.cancelReason = "Ranking change";
-
-      const historyItem = challengeHistory.findLast(history =>
-        history.challenger === item.challenger.name &&
-        history.challenged === item.challenged.name &&
-        history.status === "Pending"
-      );
-
-      if(historyItem){
-        historyItem.status = "Cancelled";
-        historyItem.cancelledAt = now;
-        historyItem.cancelReason = "Ranking change";
-      }
-    }
-  });
-}
+  
 function renderPartners(){
   const c = document.getElementById("content");
 
