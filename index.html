@@ -1081,7 +1081,7 @@ function confirmResult(){
   challenge.status="Completed";
   
   challenge.completedAt = Date.now();
-  cancelInvalidPendingChallenges();
+  cancelOutOfRangePendingChallenges();
   const historyItem = challengeHistory.findLast(item =>
   item.challenger === challenge.challenger.name &&
   item.challenged === challenge.challenged.name &&
