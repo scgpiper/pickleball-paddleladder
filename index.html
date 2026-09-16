@@ -557,38 +557,7 @@ function expireOldChallenges(){
     }
   });
 }
-function cancelOutOfRangePendingChallenges(){
-  const now = Date.now();
 
-  pendingChallenges.forEach(item => {
-    if(item.status !== "Pending") return;
-
-    const challengerRank = teamIndex(item.challenger);
-    const challengedRank = teamIndex(item.challenged);
-
-    if(
-      challengerRank === -1 ||
-      challengedRank === -1 ||
-      challengerRank <= challengedRank ||
-      challengerRank - challengedRank > 3
-    ){
-      item.status = "Cancelled";
-
-      const historyItem = challengeHistory.findLast(history =>
-        history.challenger === item.challenger.name &&
-        history.challenged === item.challenged.name &&
-        history.status === "Pending"
-      );
-
-      if(historyItem){
-        historyItem.status = "Cancelled";
-        historyItem.cancelledAt = now;
-        historyItem.cancelReason =
-          "Ranking changed — teams are no longer within challenge range.";
-      }
-    }
-  });
-}
   
   function renderChallenges(){
 expireOldChallenges();
@@ -1090,7 +1059,7 @@ function confirmResult(){
   challenge.status="Completed";
   
   challenge.completedAt = Date.now();
-  cancelOutOfRangePendingChallenges();
+  
   const historyItem = challengeHistory.findLast(item =>
   item.challenger === challenge.challenger.name &&
   item.challenged === challenge.challenged.name &&
@@ -1133,38 +1102,7 @@ function resetResult(){
   challenge.status="Accepted";
   show("score");
 }
-function cancelOutOfRangePendingChallenges(){
-  const now = Date.now();
 
-  pendingChallenges.forEach(item => {
-    if(item.status !== "Pending") return;
-
-    const challengerIndex = teamIndex(item.challenger);
-    const challengedIndex = teamIndex(item.challenged);
-
-    if(
-      challengerIndex === -1 ||
-      challengedIndex === -1 ||
-      challengerIndex <= challengedIndex ||
-      challengerIndex - challengedIndex > 3
-    ){
-      item.status = "Cancelled";
-
-      const historyItem = challengeHistory.findLast(history =>
-        history.challenger === item.challenger.name &&
-        history.challenged === item.challenged.name &&
-        history.status === "Pending"
-      );
-
-      if(historyItem){
-        historyItem.status = "Cancelled";
-        historyItem.cancelledAt = now;
-        historyItem.cancelReason =
-          "Ranking changed — challenge is no longer within 3 positions.";
-      }
-    }
-  });
-}
 function updateRecordsAndLadder(){
 
   const winner=challenge.winner;
@@ -1184,8 +1122,46 @@ function updateRecordsAndLadder(){
     const movingTeam=teams.splice(challengerIndex,1)[0];
     teams.splice(challengedIndex,0,movingTeam);
   }
+  cancelInvalidPendingChallenges();
+}
+function cancelInvalidPendingChallenges(){
 
- cancelOutOfRangePendingChallenges();
+  const now = Date.now();
+
+  pendingChallenges.forEach(item => {
+
+    if(item.status !== "Pending") return;
+
+    const challengerIndex = teamIndex(item.challenger);
+    const challengedIndex = teamIndex(item.challenged);
+
+    if(challengerIndex === -1 || challengedIndex === -1) return;
+
+    const distance = challengerIndex - challengedIndex;
+
+    // Top 10, or challenging into the Top 10 = maximum 2 positions.
+    // Below the Top 10 = maximum 3 positions.
+    const maxChallengeDistance =
+      (challengerIndex < 10 || challengedIndex < 10) ? 2 : 3;
+
+    if(distance < 1 || distance > maxChallengeDistance){
+
+      item.status = "Cancelled";
+
+      const historyItem = challengeHistory.findLast(history =>
+        history.challenger === item.challenger.name &&
+        history.challenged === item.challenged.name &&
+        history.status === "Pending"
+      );
+
+      if(historyItem){
+        historyItem.status = "Cancelled";
+        historyItem.cancelledAt = now;
+        historyItem.cancelReason =
+          "Ranking changed — challenge is now outside the allowed range.";
+      }
+    }
+  });
 }
   
 function renderPartners(){
