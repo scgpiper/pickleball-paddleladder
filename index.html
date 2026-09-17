@@ -165,10 +165,10 @@ const dbClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
 );
-  async function testSupabaseConnection(){
+async function loadLadderState(){
   const { data, error } = await dbClient
     .from("ladder_state")
-    .select("id, version")
+    .select("*")
     .eq("id", 1)
     .single();
 
@@ -177,6 +177,49 @@ const dbClient = window.supabase.createClient(
     alert("Database connection failed: " + error.message);
     return;
   }
+
+  console.log("Supabase connected:", data);
+
+  // Keep the current built-in teams when the database is still empty.
+  if(!Array.isArray(data.teams) || data.teams.length === 0){
+    console.log("Database is empty. Current leaderboard retained.");
+    return;
+  }
+
+  const selectedTeamName = myTeam ? myTeam.name : null;
+  const historyTeamName = historyTeam ? historyTeam.name : null;
+
+  teams = data.teams;
+  pendingChallenges =
+    restoreChallengeTeamReferences(data.pending_challenges);
+  challengeHistory = Array.isArray(data.challenge_history)
+    ? data.challenge_history
+    : [];
+  matchHistory = Array.isArray(data.match_history)
+    ? data.match_history
+    : [];
+  partnerListings = Array.isArray(data.partner_listings)
+    ? data.partner_listings
+    : [];
+  partnerInvites = Array.isArray(data.partner_invites)
+    ? data.partner_invites
+    : [];
+  ladderMovementHistory = Array.isArray(data.ladder_movement_history)
+    ? data.ladder_movement_history
+    : [];
+
+  myTeam = selectedTeamName
+    ? findTeamFromSavedValue(selectedTeamName)
+    : null;
+
+  historyTeam = historyTeamName
+    ? findTeamFromSavedValue(historyTeamName)
+    : null;
+
+  challenge = null;
+
+  console.log("Ladder information loaded from Supabase.");
+}
 
   console.log("Supabase connected:", data);
 }
@@ -236,6 +279,33 @@ let challenge = null;
 
 function teamIndex(team){
   return teams.indexOf(team);
+}
+  function restoreChallengeTeamReferences(items){
+  if(!Array.isArray(items)) return [];
+
+  return items.map(function(item){
+    return {
+      ...item,
+      challenger: findTeamFromSavedValue(item.challenger),
+      challenged: findTeamFromSavedValue(item.challenged),
+      winner: findTeamFromSavedValue(item.winner),
+      submittedBy: findTeamFromSavedValue(item.submittedBy)
+    };
+  }).filter(function(item){
+    return item.challenger && item.challenged;
+  });
+}
+  function findTeamFromSavedValue(value){
+  if(!value) return null;
+
+  const teamName =
+    typeof value === "string"
+      ? value
+      : value.name;
+
+  return teams.find(function(team){
+    return team.name === teamName;
+  }) || null;
 }
 function captureTeamRanks(){
   return teams.map(function(team,index){
@@ -1681,8 +1751,12 @@ function cancelPartnerInvite(index){
   renderPartners();
 }
   
-testSupabaseConnection();
-show("board");
+async function startApp(){
+  await loadLadderState();
+  show("board");
+}
+
+startApp();
 </script>
 
 </body>
