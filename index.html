@@ -177,7 +177,7 @@ let teams = [
   let matchHistory=[];
 let challengeHistory=[];
 let pendingChallenges=[];
- 
+ let ladderMovementHistory=[];
   
  
 function placeNewTeamByDupr(){
@@ -217,7 +217,34 @@ let challenge = null;
 function teamIndex(team){
   return teams.indexOf(team);
 }
+function captureTeamRanks(){
+  return teams.map(function(team,index){
+    return {
+      team: team,
+      rank: index + 1
+    };
+  });
+}
 
+function recordLadderMovements(previousRanks,reason){
+  previousRanks.forEach(function(item){
+    const newIndex = teamIndex(item.team);
+
+    if(newIndex === -1) return;
+
+    const newRank = newIndex + 1;
+
+    if(newRank !== item.rank){
+      ladderMovementHistory.push({
+        team: item.team.name,
+        fromRank: item.rank,
+        toRank: newRank,
+        reason: reason,
+        changedAt: Date.now()
+      });
+    }
+  });
+}
 function show(page){
 
   if(page==="board") renderBoard();
@@ -411,7 +438,28 @@ function renderHistory(){
     item.challenger === selectedTeam.name ||
     item.challenged === selectedTeam.name
   );
+const movementHistory = ladderMovementHistory.filter(item =>
+  item.team === selectedTeam.name
+);
 
+const netMovement = movementHistory.reduce(function(total,item){
+  return total + (item.fromRank - item.toRank);
+},0);
+
+const movementSummary =
+  netMovement > 0
+    ? "+" + netMovement + " position" + (netMovement === 1 ? "" : "s")
+    : netMovement < 0
+      ? Math.abs(netMovement) + " position" +
+        (Math.abs(netMovement) === 1 ? "" : "s") + " down"
+      : "No movement yet";
+
+const movementHtml = movementHistory.length
+  ? movementHistory.map(function(item){
+      return "<p><b>#" + item.fromRank + " → #" + item.toRank +
+        "</b><br>" + item.reason + "</p>";
+    }).join("")
+  : "<p>No ladder movement recorded yet.</p>";
   const options = teams.map(function(team,index){
     return "<option value='" + index + "' " +
       (team === selectedTeam ? "selected" : "") + ">" +
@@ -441,8 +489,11 @@ function renderHistory(){
     "<p><b>Record:</b> " + selectedTeam.wins + "-" + selectedTeam.losses + "</p>" +
     "<p><b>Combined DUPR:</b> " + duprDisplay + "</p>" +
     "<p><b>Challenges:</b> Issued " + issued + " · Received " + received + "</p>" +
-    "<h3>Challenge History</h3>" +
-    historyHtml;
+"<p><b>Net ladder movement:</b> " + movementSummary + "</p>" +
+"<h3>Ladder Movement</h3>" +
+movementHtml +
+"<h3>Challenge History</h3>" +
+historyHtml;
 }
 function renderAdminReview(){
   expireOldChallenges();
@@ -1024,6 +1075,7 @@ if(!item || item.status !== "Decline Pending Admin Review"){
   alert("This declined challenge could not be found.");
   return;
 }
+  const previousRanks = captureTeamRanks();
   const decliningTeam = item.challenged;
   const decliningIndex = teamIndex(decliningTeam);
 
@@ -1032,7 +1084,7 @@ if(!item || item.status !== "Decline Pending Admin Review"){
     teams[decliningIndex] = teamBelow;
     teams[decliningIndex + 1] = decliningTeam;
   }
-
+recordLadderMovements(previousRanks,"Decline penalty");
   item.status = "Declined - Penalty Applied";
   item.declineReviewedAt = Date.now();
 
@@ -1296,7 +1348,7 @@ function resetResult(){
 }
 
 function updateRecordsAndLadder(){
-
+const previousRanks = captureTeamRanks();
   const winner=challenge.winner;
   const loser=
     winner===challenge.challenger
@@ -1314,6 +1366,7 @@ function updateRecordsAndLadder(){
     const movingTeam=teams.splice(challengerIndex,1)[0];
     teams.splice(challengedIndex,0,movingTeam);
   }
+  recordLadderMovements(previousRanks,"Match result");
   cancelInvalidPendingChallenges();
 }
 function cancelInvalidPendingChallenges(){
