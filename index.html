@@ -455,7 +455,8 @@ reviews.forEach((item,index)=>{
       "<b>"+item.challenger.name+" vs. "+item.challenged.name+"</b><br><br>"+
       "<b>Reason:</b> Match was not completed within 7 days.<br><br>"+
      "<b>Status:</b> Overdue — waiting for admin review.<br><br>"+
-"<button class='acceptBtn smallBtn' onclick='extendOverdueMatch("+index+")'>Extend 7 Days</button>"+
+"<button class='acceptBtn smallBtn' onclick='extendOverdueMatch("+index+")'>Extend 7 Days</button> "+
+"<button class='declineBtn smallBtn' onclick='recordOverdueForfeit("+index+")'>Record Forfeit</button>"+
 "</div>";
   }else{
     c.innerHTML+=
@@ -495,6 +496,67 @@ reviews.forEach((item,index)=>{
   if(historyItem){
     historyItem.status = "Accepted";
     historyItem.extendedAt = Date.now();
+  }
+
+  renderAdminReview();
+}
+  function recordOverdueForfeit(index){
+
+  const reviews = pendingChallenges.filter(item =>
+    item.status === "Decline Pending Admin Review" ||
+    item.status === "Overdue"
+  );
+
+  const item = reviews[index];
+
+  if(!item || item.status !== "Overdue"){
+    alert("This overdue match could not be found.");
+    return;
+  }
+
+  const forfeitingTeam = prompt(
+    "Which team forfeited?\n\n1 = "+item.challenger.name+
+    "\n2 = "+item.challenged.name
+  );
+
+  if(forfeitingTeam !== "1" && forfeitingTeam !== "2"){
+    alert("Forfeit cancelled.");
+    return;
+  }
+
+  challenge = item;
+
+  challenge.winner =
+    forfeitingTeam === "1"
+      ? item.challenged
+      : item.challenger;
+
+  updateRecordsAndLadder();
+
+  challenge.status = "Completed";
+  challenge.completedAt = Date.now();
+  challenge.forfeit = true;
+
+  matchHistory.push({
+    teamA: challenge.challenger.name,
+    teamB: challenge.challenged.name,
+    completedAt: challenge.completedAt,
+    forfeit: true
+  });
+
+  const historyItem = challengeHistory.findLast(history =>
+    history.challenger === challenge.challenger.name &&
+    history.challenged === challenge.challenged.name &&
+    history.status === "Overdue"
+  );
+
+  if(historyItem){
+    historyItem.status = "Completed - Forfeit";
+    historyItem.completedAt = challenge.completedAt;
+    historyItem.forfeitedBy =
+  forfeitingTeam === "1"
+    ? item.challenger.name
+    : item.challenged.name;
   }
 
   renderAdminReview();
