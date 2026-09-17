@@ -208,6 +208,7 @@ function placeNewTeamByDupr(){
   teams.splice(insertIndex, 0, newTeam);
 }
 let myTeam = null;
+  let historyTeam = null;
  let partnerListings = [];
   let createdTeams = [];
   let partnerInvites = [];
@@ -375,28 +376,73 @@ if(teamActiveMatch){
   c.innerHTML=html;
 }
 function renderHistory(){
-  const c=document.getElementById("content");
+  const c = document.getElementById("content");
 
-  if(!myTeam){
-    c.innerHTML=
-      "<h2>History / Stats</h2>"+
-      "<p>Please choose your team from the Leaderboard first.</p>";
+  if(!teams.length){
+    c.innerHTML =
+      "<h2>📊 History / Stats</h2>" +
+      "<p>No teams are currently on the ladder.</p>";
     return;
   }
 
-  const rank=teamIndex(myTeam)+1;
+  let selectedTeam = historyTeam || myTeam || teams[0];
 
-  c.innerHTML=
-    "<h2>📊 History / Stats</h2>"+
-    "<h3>"+myTeam.name+"</h3>"+
-    "<p><b>Current Rank:</b> #"+rank+"</p>"+
-    "<p><b>Record:</b> "+myTeam.wins+"-"+myTeam.losses+"</p>"+
-    "<p><b>Combined DUPR:</b> "+Number(myTeam.dupr).toFixed(2)+"</p>"+
-    "<h3>Challenge History</h3>"+
-challengeHistory
-  .filter(item => item.challenger===myTeam.name || item.challenged===myTeam.name)
-  .map(item => "<p><b>"+item.challenger+"</b> → <b>"+item.challenged+"</b><br>Status: "+item.status+(item.declineReason ? "<br>Reason: "+item.declineReason : "")+(item.cancelReason ? "<br>Reason: "+item.cancelReason : "")+"</p>")
-  .join("");
+  if(!teams.includes(selectedTeam)){
+    selectedTeam = teams[0];
+    historyTeam = selectedTeam;
+  }
+
+  const rank = teamIndex(selectedTeam) + 1;
+
+  const duprDisplay =
+    selectedTeam.isNR || String(selectedTeam.dupr).toUpperCase() === "NR"
+      ? "NR"
+      : Number(selectedTeam.dupr).toFixed(2);
+
+  const issued = challengeHistory.filter(item =>
+    item.challenger === selectedTeam.name
+  ).length;
+
+  const received = challengeHistory.filter(item =>
+    item.challenged === selectedTeam.name
+  ).length;
+
+  const teamHistory = challengeHistory.filter(item =>
+    item.challenger === selectedTeam.name ||
+    item.challenged === selectedTeam.name
+  );
+
+  const options = teams.map(function(team,index){
+    return "<option value='" + index + "' " +
+      (team === selectedTeam ? "selected" : "") + ">" +
+      "#" + (index + 1) + " — " + team.name +
+      "</option>";
+  }).join("");
+
+  const historyHtml = teamHistory.length
+    ? teamHistory.map(function(item){
+        return "<p><b>" + item.challenger + "</b> → <b>" +
+          item.challenged + "</b><br>Status: " + item.status +
+          (item.declineReason ? "<br>Reason: " + item.declineReason : "") +
+          (item.cancelReason ? "<br>Reason: " + item.cancelReason : "") +
+          "</p>";
+      }).join("")
+    : "<p>No challenge history yet.</p>";
+
+  c.innerHTML =
+    "<h2>📊 History / Stats</h2>" +
+    "<p><b>View team</b></p>" +
+    "<select onchange='selectHistoryTeam(this.value)' " +
+      "style='width:100%;padding:12px;font-size:16px;'>" +
+      options +
+    "</select>" +
+    "<h3>" + selectedTeam.name + "</h3>" +
+    "<p><b>Current Rank:</b> #" + rank + "</p>" +
+    "<p><b>Record:</b> " + selectedTeam.wins + "-" + selectedTeam.losses + "</p>" +
+    "<p><b>Combined DUPR:</b> " + duprDisplay + "</p>" +
+    "<p><b>Challenges:</b> Issued " + issued + " · Received " + received + "</p>" +
+    "<h3>Challenge History</h3>" +
+    historyHtml;
 }
 function renderAdminReview(){
   expireOldChallenges();
@@ -574,7 +620,15 @@ function selectTeam(value){
 
   renderBoard();
 }
+function selectHistoryTeam(value){
+  if(value === ""){
+    historyTeam = null;
+  }else{
+    historyTeam = teams[parseInt(value)];
+  }
 
+  renderHistory();
+}
 function issueChallenge(opponentIndex){
 
   if(!myTeam) return;
