@@ -1471,19 +1471,22 @@ function acceptPartnerInvite(index){
     return;
   }
 
-  invite.status = "Accepted";
-  const senderIsNR = invite.fromDupr.toUpperCase() === "NR";
+const senderIsNR = String(invite.fromDupr).toUpperCase() === "NR";
 const partnerIsNR = String(invite.toDupr).toUpperCase() === "NR";
 const teamIsNR = senderIsNR || partnerIsNR;
 
 const combinedDupr = teamIsNR
   ? "NR"
   : (parseFloat(invite.fromDupr) + parseFloat(invite.toDupr)).toFixed(2);
+
 const teamName = prompt("Enter your team name:");
+
 if(teamName === null || teamName.trim() === ""){
-    alert("Please enter a team name.");
-    return;
+  alert("Please enter a team name.");
+  return;
 }
+
+invite.status = "Accepted";
 createdTeams.push({
 name: teamName.trim(),
   players: invite.from + " / " + invite.to,
@@ -1495,7 +1498,10 @@ player2Gender: invite.toGender,
   wins: 0,
   losses: 0
 });
-  placeNewTeamByDupr();
+ 
+placeNewTeamByDupr();
+myTeam = createdTeams[createdTeams.length - 1];
+
 partnerListings = partnerListings.filter(function(player){
     return player.name !== invite.to && player.name !== invite.from;
 });
@@ -1505,7 +1511,7 @@ partnerListings = partnerListings.filter(function(player){
     invite.to + " accepted the partner invite from " + invite.from + "."
   );
 
-  renderBoard();
+ show("board");
 }
 
 function declinePartnerInvite(index){
