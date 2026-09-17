@@ -274,17 +274,27 @@ function show(page){
   if(page==="rules"){
     document.getElementById("content").innerHTML=
       "<h2>Rules / Help</h2>"+
-      "<p><b>Challenge:</b> A team may challenge up to 3 positions above.</p>"+
+      "<p><b>Challenge:</b> Teams in the Top 10, or teams challenging to enter the Top 10, may challenge up to 2 positions above. Teams below the Top 10 may challenge up to 3 positions above.</p>"+
+      "<p><b>Challenge response:</b> A team has 72 hours to accept or decline a challenge.</p>"+
+"<p><b>Play deadline:</b> Once accepted, the match must be completed within 7 days. If not completed, it becomes Overdue and goes to Admin Review.</p>"+
+      "<p><b>Overdue matches:</b> Admin may extend the match another 7 days, record a forfeit, or cancel the match. A cancelled overdue match causes no win, loss, or ranking movement.</p>"+
+"<p><b>Forfeit:</b> A forfeit counts as a loss for the forfeiting team and a win for the opponent. Normal ladder movement applies if the challenger wins by forfeit.</p>"+
       "<p><b>Match:</b> Best 3 of 5 games to 11, win by 2.</p>"+
-      "<p><b>Challenger wins:</b> Challenger takes the challenged team's position. Teams between them move down one position.</p>"+
-      "<p><b>Challenged team wins:</b> Ladder positions do not change.</p>"+
-      "<p><b>Results:</b> The opposing team must confirm the submitted result before standings change.</p>"+
-      "<p><b>New teams:</b> Combined DUPR determines initial placement, but a new team cannot initially enter the Top 10.</p>";
+     
+"<p><b>Challenger wins:</b> Challenger takes the challenged team's position. Teams between them move down one position.</p>"+
+"<p><b>Challenged team wins:</b> Ladder positions do not change.</p>"+
+"<p><b>Results:</b> The opposing team must confirm the submitted result before standings change.</p>"+
+      "<p><b>Challenge priority:</b> When a team has multiple eligible challenges, it must deal with the highest-ranked challenger first.</p>"+
+"<p><b>Challenge activity:</b> A team must accept at least one eligible challenge during each 14-day period but may decline other challenges.</p>"+
+"<p><b>Re-challenges:</b> The same teams must wait 7 days before challenging each other again.</p>"+
+"<p><b>Partner changes:</b> Changing partners creates a new team, which must re-enter under the new-team placement rules.</p>"+
+"<p><b>Inactivity:</b> An inactive team drops one position every 14 days. A team at position 11 is removed when its next inactivity drop becomes due.</p>"+
+"<p><b>New teams:</b> Combined DUPR determines initial placement, but a new team cannot initially enter the Top 10.</p>";
   }
 }
 
 function renderBoard(){
-checkAcceptanceEnforcement();
+  checkAcceptanceEnforcement();
   const c=document.getElementById("content");
 
   let options='<option value="">Choose your team...</option>';
