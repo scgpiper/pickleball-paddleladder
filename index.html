@@ -1353,11 +1353,12 @@ function renderPartners(){
         "<b>To:</b> " + invite.to + "<br>" +
         "<b>Status:</b> " + invite.status + "<br><br>" +
 
-        (invite.status === "Pending"
-          ? "<button class='smallBtn' onclick='acceptPartnerInvite(" + index + ")'>Accept</button> " +
-            "<button class='smallBtn' onclick='declinePartnerInvite(" + index + ")'>Decline</button>"
-          : ""
-        ) +
+ (invite.status === "Pending"
+  ? "<button class='smallBtn' onclick='acceptPartnerInvite(" + index + ")'>Accept</button> " +
+    "<button class='smallBtn' onclick='declinePartnerInvite(" + index + ")'>Decline</button> " +
+    "<button class='declineBtn smallBtn' onclick='cancelPartnerInvite(" + index + ")'>Cancel Invite</button>"
+  : ""
+) +
 
       "</div><br>";
     }).join("")
@@ -1528,11 +1529,32 @@ function declinePartnerInvite(index){
     invite.to + " declined the partner invite from " + invite.from + "."
   );
 
+   renderPartners();
+}
+
+function cancelPartnerInvite(index){
+  const invite = partnerInvites[index];
+
+  if(!invite || invite.status !== "Pending"){
+    alert("This partner invitation could not be found.");
+    return;
+  }
+
+  if(!confirm(invite.from + ", cancel your invitation to " + invite.to + "?")){
+    return;
+  }
+
+  invite.status = "Cancelled";
+  invite.cancelledAt = Date.now();
+
+  alert(
+    invite.from + " cancelled the partner invitation to " + invite.to + "."
+  );
+
   renderPartners();
 }
   
 show("board");
-
 </script>
 
 </body>
