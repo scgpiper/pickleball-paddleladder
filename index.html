@@ -157,9 +157,29 @@ select{
 <div id="content" class="card"></div>
 
 </main>
-
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+const SUPABASE_URL = "https://lnxqaqxrtxtkiiikaqhg.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = sb_publishable_hsbU7OslX93sjImve7QdAg_ZIbOC8oE
+const dbClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);
+  async function testSupabaseConnection(){
+  const { data, error } = await dbClient
+    .from("ladder_state")
+    .select("id, version")
+    .eq("id", 1)
+    .single();
 
+  if(error){
+    console.error("Supabase connection failed:", error);
+    alert("Database connection failed: " + error.message);
+    return;
+  }
+
+  console.log("Supabase connected:", data);
+}
 let teams = [
   {name:"Baseline Bandits",players:"Adams / Brown",dupr:9.10,wins:8,losses:1},
   {name:"Kitchen Kings",players:"Carter / Davis",dupr:8.95,wins:7,losses:2},
@@ -1661,6 +1681,7 @@ function cancelPartnerInvite(index){
   renderPartners();
 }
   
+testSupabaseConnection();
 show("board");
 </script>
 
