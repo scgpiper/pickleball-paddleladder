@@ -456,9 +456,10 @@ reviews.forEach((item,index)=>{
       "<b>Reason:</b> Match was not completed within 7 days.<br><br>"+
      "<b>Status:</b> Overdue — waiting for admin review.<br><br>"+
 "<button class='acceptBtn smallBtn' onclick='extendOverdueMatch("+index+")'>Extend 7 Days</button> "+
-"<button class='declineBtn smallBtn' onclick='recordOverdueForfeit("+index+")'>Record Forfeit</button>"+
+"<button class='declineBtn smallBtn' onclick='recordOverdueForfeit("+index+")'>Record Forfeit</button> "+
+"<button class='declineBtn smallBtn' onclick='cancelOverdueMatch("+index+")'>Cancel Match</button>"+
 "</div>";
-  }else{
+}else{
     c.innerHTML+=
       "<div class='warning'>"+
       "<b>"+item.challenger.name+" challenged "+item.challenged.name+"</b><br><br>"+
@@ -557,6 +558,41 @@ reviews.forEach((item,index)=>{
   forfeitingTeam === "1"
     ? item.challenger.name
     : item.challenged.name;
+  }
+
+  renderAdminReview();
+}
+  function cancelOverdueMatch(index){
+
+  const reviews = pendingChallenges.filter(item =>
+    item.status === "Decline Pending Admin Review" ||
+    item.status === "Overdue"
+  );
+
+  const item = reviews[index];
+
+  if(!item || item.status !== "Overdue"){
+    alert("This overdue match could not be found.");
+    return;
+  }
+
+  if(!confirm("Cancel this overdue match? No win, loss, or ranking movement will occur.")){
+    return;
+  }
+
+  item.status = "Cancelled";
+  item.cancelledAt = Date.now();
+
+  const historyItem = challengeHistory.findLast(history =>
+    history.challenger === item.challenger.name &&
+    history.challenged === item.challenged.name &&
+    history.status === "Overdue"
+  );
+
+  if(historyItem){
+    historyItem.status = "Cancelled";
+    historyItem.cancelledAt = item.cancelledAt;
+    historyItem.cancelReason = "Overdue match cancelled by admin.";
   }
 
   renderAdminReview();
