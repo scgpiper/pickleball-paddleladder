@@ -165,8 +165,8 @@ const dbClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
 );
-  let currentUser = null;
-
+let currentUser = null;
+let ladderStateVersion = 1;
 async function loadCurrentUser(){
   const { data, error } = await dbClient.auth.getSession();
 
@@ -225,7 +225,7 @@ async function loadLadderState(){
   }
 
   console.log("Supabase connected:", data);
-
+  ladderStateVersion = Number(data.version) || 1;
   // Keep the current built-in teams when the database is still empty.
   if(!Array.isArray(data.teams) || data.teams.length === 0){
     console.log("Database is empty. Current leaderboard retained.");
@@ -266,7 +266,48 @@ async function loadLadderState(){
 
   console.log("Ladder information loaded from Supabase.");
 }
+async function saveLadderState(){
+  if(!currentUser){
+    alert("Please sign in before making ladder changes.");
+    return false;
+  }
 
+  const nextVersion = ladderStateVersion + 1;
+
+  const { data, error } = await dbClient
+    .from("ladder_state")
+    .update({
+      teams: teams,
+      pending_challenges: pendingChallenges,
+      challenge_history: challengeHistory,
+      match_history: matchHistory,
+      partner_listings: partnerListings,
+      partner_invites: partnerInvites,
+      ladder_movement_history: ladderMovementHistory,
+      version: nextVersion,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", 1)
+    .eq("version", ladderStateVersion)
+    .select("version");
+
+  if(error){
+    console.error("Could not save ladder:", error);
+    alert("The ladder could not be saved: " + error.message);
+    return false;
+  }
+
+  if(!data || data.length === 0){
+    alert(
+      "Someone else updated the ladder first. Refresh the page before trying again."
+    );
+    return false;
+  }
+
+  ladderStateVersion = data[0].version;
+  console.log("Ladder saved to Supabase.");
+  return true;
+}
 
 let teams = [
   {name:"Baseline Bandits",players:"Adams / Brown",dupr:9.10,wins:8,losses:1},
@@ -428,7 +469,8 @@ const c=document.getElementById("content");
   const authHtml = currentUser
     ? "<div class='success'>" +
         "<b>Signed in:</b> " + currentUser.email + "<br><br>" +
-        "<button class='smallBtn' onclick='signOutUser()'>Sign Out</button>" +
+        "<button class='smallBtn' onclick='saveLadderState()'>Save Ladder</button> " +
+"<button class='smallBtn' onclick='signOutUser()'>Sign Out</button>" +
       "</div>"
     : "<div class='warning'>" +
         "<b>You are viewing the public ladder.</b><br><br>" +
