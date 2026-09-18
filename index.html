@@ -1148,7 +1148,16 @@ if(challenge.status==="Decline Pending Admin Review"){
   }
 }
 
-function acceptChallenge(){
+async function acceptChallenge(){
+    if(!currentUser){
+    alert("Please sign in before accepting a challenge.");
+    return;
+  }
+
+  if(!challenge || challenge.status !== "Pending" || challenge.challenged !== myTeam){
+    alert("Only the challenged team can accept this challenge.");
+    return;
+  }
   const activeMatch = pendingChallenges.find(item =>
   item !== challenge &&
   ["Accepted","Awaiting Confirmation"].includes(item.status) &&
@@ -1175,9 +1184,14 @@ if(activeMatch){
   item.status==="Pending"
 );
 if(historyItem) historyItem.status="Accepted";
+   const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
   renderChallenges();
 }
-
 function declineChallenge(){
   
   const priorityChallenge = pendingChallenges
