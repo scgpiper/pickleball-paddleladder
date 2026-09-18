@@ -739,7 +739,11 @@ reviews.forEach((item,index)=>{
   }
 });
 }
-  function extendOverdueMatch(index){
+ async function extendOverdueMatch(index){
+  if(!isAdmin()){
+    alert("Only the ladder administrator can extend overdue matches.");
+    return;
+  }
 
   const reviews = pendingChallenges.filter(item =>
     item.status === "Decline Pending Admin Review" ||
@@ -764,12 +768,22 @@ reviews.forEach((item,index)=>{
 
   if(historyItem){
     historyItem.status = "Accepted";
-    historyItem.extendedAt = Date.now();
+    historyItem.extendedAt = item.acceptedAt;
+  }
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
   }
 
   renderAdminReview();
 }
-  function recordOverdueForfeit(index){
+ async function recordOverdueForfeit(index){
+  if(!isAdmin()){
+    alert("Only the ladder administrator can record a forfeit.");
+    return;
+  }
 
   const reviews = pendingChallenges.filter(item =>
     item.status === "Decline Pending Admin Review" ||
@@ -784,8 +798,8 @@ reviews.forEach((item,index)=>{
   }
 
   const forfeitingTeam = prompt(
-    "Which team forfeited?\n\n1 = "+item.challenger.name+
-    "\n2 = "+item.challenged.name
+    "Which team forfeited?\n\n1 = " + item.challenger.name +
+    "\n2 = " + item.challenged.name
   );
 
   if(forfeitingTeam !== "1" && forfeitingTeam !== "2"){
@@ -823,14 +837,24 @@ reviews.forEach((item,index)=>{
     historyItem.status = "Completed - Forfeit";
     historyItem.completedAt = challenge.completedAt;
     historyItem.forfeitedBy =
-  forfeitingTeam === "1"
-    ? item.challenger.name
-    : item.challenged.name;
+      forfeitingTeam === "1"
+        ? item.challenger.name
+        : item.challenged.name;
+  }
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
   }
 
   renderAdminReview();
 }
-  function cancelOverdueMatch(index){
+async function cancelOverdueMatch(index){
+  if(!isAdmin()){
+    alert("Only the ladder administrator can cancel overdue matches.");
+    return;
+  }
 
   const reviews = pendingChallenges.filter(item =>
     item.status === "Decline Pending Admin Review" ||
@@ -861,6 +885,12 @@ reviews.forEach((item,index)=>{
     historyItem.status = "Cancelled";
     historyItem.cancelledAt = item.cancelledAt;
     historyItem.cancelReason = "Overdue match cancelled by admin.";
+  }
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
   }
 
   renderAdminReview();
