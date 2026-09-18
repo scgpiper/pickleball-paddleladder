@@ -1436,8 +1436,20 @@ function validGame(a,b){
   return true;
 }
 
-function submitResult(){
+async function submitResult(){
+  if(!currentUser){
+    alert("Please sign in before submitting a result.");
+    return;
+  }
 
+  if(
+    !challenge ||
+    challenge.status !== "Accepted" ||
+    (challenge.challenger !== myTeam && challenge.challenged !== myTeam)
+  ){
+    alert("No accepted match was found for your team.");
+    return;
+  }
   const g1a=parseInt(document.getElementById("g1a").value);
   const g1b=parseInt(document.getElementById("g1b").value);
   const g2a=parseInt(document.getElementById("g2a").value);
@@ -1510,6 +1522,12 @@ let challengedGames=0;
 
   challenge.submittedBy=myTeam;
   challenge.status="Awaiting Confirmation";
+
+   const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
 
   renderChallenges();
 }
