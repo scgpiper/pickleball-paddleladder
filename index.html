@@ -1275,18 +1275,24 @@ historyItem.status="Decline Pending Admin Review";
 
     renderChallenges();
 }
-function approveDecline(index){
- const reviews = pendingChallenges.filter(item =>
-  item.status === "Decline Pending Admin Review" ||
-  item.status === "Overdue"
-);
+async function approveDecline(index){
+  if(!isAdmin()){
+    alert("Only the ladder administrator can review declines.");
+    return;
+  }
 
-const item = reviews[index];
+  const reviews = pendingChallenges.filter(item =>
+    item.status === "Decline Pending Admin Review" ||
+    item.status === "Overdue"
+  );
 
-if(!item || item.status !== "Decline Pending Admin Review"){
-  alert("This declined challenge could not be found.");
-  return;
-}
+  const item = reviews[index];
+
+  if(!item || item.status !== "Decline Pending Admin Review"){
+    alert("This declined challenge could not be found.");
+    return;
+  }
+
   item.status = "Declined";
   item.declineReviewedAt = Date.now();
 
@@ -1298,24 +1304,36 @@ if(!item || item.status !== "Decline Pending Admin Review"){
 
   if(historyItem){
     historyItem.status = "Declined";
-    historyItem.declineReviewedAt = Date.now();
+    historyItem.declineReviewedAt = item.declineReviewedAt;
   }
 
-  renderChallenges();
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
+  renderAdminReview();
 }
 
-function rejectDecline(index){
- const reviews = pendingChallenges.filter(item =>
-  item.status === "Decline Pending Admin Review" ||
-  item.status === "Overdue"
-);
+async function rejectDecline(index){
+  if(!isAdmin()){
+    alert("Only the ladder administrator can review declines.");
+    return;
+  }
 
-const item = reviews[index];
+  const reviews = pendingChallenges.filter(item =>
+    item.status === "Decline Pending Admin Review" ||
+    item.status === "Overdue"
+  );
 
-if(!item || item.status !== "Decline Pending Admin Review"){
-  alert("This declined challenge could not be found.");
-  return;
-}
+  const item = reviews[index];
+
+  if(!item || item.status !== "Decline Pending Admin Review"){
+    alert("This declined challenge could not be found.");
+    return;
+  }
+
   const previousRanks = captureTeamRanks();
   const decliningTeam = item.challenged;
   const decliningIndex = teamIndex(decliningTeam);
@@ -1325,7 +1343,9 @@ if(!item || item.status !== "Decline Pending Admin Review"){
     teams[decliningIndex] = teamBelow;
     teams[decliningIndex + 1] = decliningTeam;
   }
-recordLadderMovements(previousRanks,"Decline penalty");
+
+  recordLadderMovements(previousRanks, "Decline penalty");
+
   item.status = "Declined - Penalty Applied";
   item.declineReviewedAt = Date.now();
 
@@ -1337,10 +1357,16 @@ recordLadderMovements(previousRanks,"Decline penalty");
 
   if(historyItem){
     historyItem.status = "Declined - Penalty Applied";
-    historyItem.declineReviewedAt = Date.now();
+    historyItem.declineReviewedAt = item.declineReviewedAt;
   }
 
-  renderChallenges();
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
+  renderAdminReview();
 }
 async function cancelChallenge(){
   if(!currentUser){
