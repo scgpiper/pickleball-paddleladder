@@ -166,6 +166,17 @@ const dbClient = window.supabase.createClient(
   SUPABASE_PUBLISHABLE_KEY
 );
 let currentUser = null;
+  const ADMIN_EMAILS = [
+  "scgpiper@gmail.com"
+];
+
+function isAdmin(){
+  if(!currentUser || !currentUser.email) return false;
+
+  return ADMIN_EMAILS.includes(
+    currentUser.email.toLowerCase()
+  );
+}
 let ladderStateVersion = 1;
 async function loadCurrentUser(){
   const { data, error } = await dbClient.auth.getSession();
@@ -428,8 +439,15 @@ function show(page){
   if(page==="score") renderScore();
   if(page==="partners") renderPartners();
   if(page==="history") renderHistory();
-  if(page==="admin") renderAdminReview();
+   if(page==="admin"){
+    if(!isAdmin()){
+      alert("Admin Review is available only to the ladder administrator.");
+      renderBoard();
+      return;
+    }
 
+    renderAdminReview();
+  }
   if(page==="rules"){
     document.getElementById("content").innerHTML=
       "<h2>Rules / Help</h2>"+
