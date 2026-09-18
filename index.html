@@ -165,6 +165,52 @@ const dbClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
 );
+  let currentUser = null;
+
+async function loadCurrentUser(){
+  const { data, error } = await dbClient.auth.getSession();
+
+  if(error){
+    console.error("Could not check sign-in:", error);
+    return;
+  }
+
+  currentUser = data.session ? data.session.user : null;
+}
+
+async function signInWithEmail(){
+  const email = prompt("Enter your email address:");
+
+  if(email === null || email.trim() === ""){
+    return;
+  }
+
+  const { error } = await dbClient.auth.signInWithOtp({
+    email: email.trim(),
+    options: {
+      emailRedirectTo: window.location.origin
+    }
+  });
+
+  if(error){
+    alert("Sign-in failed: " + error.message);
+    return;
+  }
+
+  alert("Check your email and click the PaddleLadder sign-in link.");
+}
+
+async function signOutUser(){
+  const { error } = await dbClient.auth.signOut();
+
+  if(error){
+    alert("Sign-out failed: " + error.message);
+    return;
+  }
+
+  currentUser = null;
+  renderBoard();
+}
 async function loadLadderState(){
   const { data, error } = await dbClient
     .from("ladder_state")
@@ -379,9 +425,18 @@ const c=document.getElementById("content");
       '#'+(i+1)+' — '+team.name+
       '</option>';
   });
-
-  let html=
+  const authHtml = currentUser
+    ? "<div class='success'>" +
+        "<b>Signed in:</b> " + currentUser.email + "<br><br>" +
+        "<button class='smallBtn' onclick='signOutUser()'>Sign Out</button>" +
+      "</div>"
+    : "<div class='warning'>" +
+        "<b>You are viewing the public ladder.</b><br><br>" +
+        "<button class='smallBtn' onclick='signInWithEmail()'>Sign In by Email</button>" +
+      "</div>";
+    let html=
     "<h2>Leaderboard</h2>"+
+    authHtml+
     "<p><b>Which team are you?</b></p>"+
     "<select onchange='selectTeam(this.value)'>"+options+"</select>";
 
@@ -1751,6 +1806,7 @@ function cancelPartnerInvite(index){
 }
   
 async function startApp(){
+  await loadCurrentUser();
   await loadLadderState();
   show("board");
 }
