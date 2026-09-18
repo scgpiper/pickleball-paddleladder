@@ -1547,8 +1547,21 @@ function scoreSummary(){
   return html;
 }
 
-function confirmResult(){
+async function confirmResult(){
+  if(!currentUser){
+    alert("Please sign in before confirming a result.");
+    return;
+  }
 
+  if(
+    !challenge ||
+    challenge.status !== "Awaiting Confirmation" ||
+    (challenge.challenger !== myTeam && challenge.challenged !== myTeam) ||
+    challenge.submittedBy === myTeam
+  ){
+    alert("Only the opposing team can confirm this result.");
+    return;
+  }
   updateRecordsAndLadder();
   challenge.status="Completed";
   
@@ -1569,6 +1582,12 @@ if(historyItem){
     teamB: challenge.challenged.name,
     completedAt: challenge.completedAt
 });
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
   renderChallenges();
 }
 
