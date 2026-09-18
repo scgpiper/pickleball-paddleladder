@@ -1591,8 +1591,23 @@ if(historyItem){
   renderChallenges();
 }
 
-function disputeResult(){
-  challenge.status="Disputed";
+async function disputeResult(){
+  if(!currentUser){
+    alert("Please sign in before disputing a result.");
+    return;
+  }
+
+  if(
+    !challenge ||
+    challenge.status !== "Awaiting Confirmation" ||
+    (challenge.challenger !== myTeam && challenge.challenged !== myTeam) ||
+    challenge.submittedBy === myTeam
+  ){
+    alert("Only the opposing team can dispute this result.");
+    return;
+  }
+
+  challenge.status = "Disputed";
 
   const historyItem = challengeHistory.findLast(item =>
     item.challenger === challenge.challenger.name &&
@@ -1605,14 +1620,52 @@ function disputeResult(){
     historyItem.disputedAt = Date.now();
   }
 
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
   renderChallenges();
 }
 
-function resetResult(){
-  challenge.scores=null;
-  challenge.winner=null;
-  challenge.submittedBy=null;
-  challenge.status="Accepted";
+async function resetResult(){
+  if(!currentUser){
+    alert("Please sign in before re-entering a result.");
+    return;
+  }
+
+  if(
+    !challenge ||
+    challenge.status !== "Disputed" ||
+    challenge.submittedBy !== myTeam
+  ){
+    alert("Only the team that submitted the result can re-enter it.");
+    return;
+  }
+
+  const historyItem = challengeHistory.findLast(item =>
+    item.challenger === challenge.challenger.name &&
+    item.challenged === challenge.challenged.name &&
+    item.status === "Disputed"
+  );
+
+  if(historyItem){
+    historyItem.status = "Accepted";
+    historyItem.resetAt = Date.now();
+  }
+
+  challenge.scores = null;
+  challenge.winner = null;
+  challenge.submittedBy = null;
+  challenge.status = "Accepted";
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
   show("score");
 }
 
