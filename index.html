@@ -991,31 +991,33 @@ challengeHistory.push({
 function expireOldChallenges(){
 
   const now = Date.now();
+  let stateChanged = false;
 
   pendingChallenges.forEach(item => {
 
     // Pending challenge: 72 hours to respond
-   if(
-  item.status === "Pending" &&
-  item.createdAt &&
-  now - item.createdAt >= 72 * 60 * 60 * 1000
-){
-  item.status = "Decline Pending Admin Review";
-  item.declineReason = "No response within 72 hours.";
-  item.declinedAt = now;
+    if(
+      item.status === "Pending" &&
+      item.createdAt &&
+      now - item.createdAt >= 72 * 60 * 60 * 1000
+    ){
+      item.status = "Decline Pending Admin Review";
+      stateChanged = true;
+      item.declineReason = "No response within 72 hours.";
+      item.declinedAt = now;
 
-  const historyItem = challengeHistory.findLast(history =>
-    history.challenger === item.challenger.name &&
-    history.challenged === item.challenged.name &&
-    history.status === "Pending"
-  );
+      const historyItem = challengeHistory.findLast(history =>
+        history.challenger === item.challenger.name &&
+        history.challenged === item.challenged.name &&
+        history.status === "Pending"
+      );
 
-  if(historyItem){
-    historyItem.status = "Decline Pending Admin Review";
-    historyItem.declineReason = item.declineReason;
-    historyItem.declinedAt = now;
-  }
-}
+      if(historyItem){
+        historyItem.status = "Decline Pending Admin Review";
+        historyItem.declineReason = item.declineReason;
+        historyItem.declinedAt = now;
+      }
+    }
 
     // Accepted challenge: 7 days to play
     if(
@@ -1024,6 +1026,7 @@ function expireOldChallenges(){
       now - item.acceptedAt >= 7 * 24 * 60 * 60 * 1000
     ){
       item.status = "Overdue";
+      stateChanged = true;
 
       const historyItem = challengeHistory.findLast(history =>
         history.challenger === item.challenger.name &&
@@ -1037,6 +1040,8 @@ function expireOldChallenges(){
       }
     }
   });
+
+  return stateChanged;
 }
 
   
@@ -2060,6 +2065,17 @@ function cancelPartnerInvite(index){
 async function startApp(){
   await loadCurrentUser();
   await loadLadderState();
+
+  const deadlineChanges = expireOldChallenges();
+
+  if(deadlineChanges && currentUser){
+    const saved = await saveLadderState();
+
+    if(!saved){
+      await loadLadderState();
+    }
+  }
+
   show("board");
 }
 
