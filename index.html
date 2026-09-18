@@ -1296,8 +1296,11 @@ recordLadderMovements(previousRanks,"Decline penalty");
 
   renderChallenges();
 }
-function cancelChallenge(){
-
+async function cancelChallenge(){
+  if(!currentUser){
+    alert("Please sign in before cancelling a challenge.");
+    return;
+  }
   if(!challenge || challenge.status !== "Pending" || challenge.challenger !== myTeam){
     alert("Only the challenger can cancel a pending challenge.");
     return;
@@ -1318,6 +1321,12 @@ function cancelChallenge(){
   if(historyItem){
     historyItem.status = "Cancelled";
     historyItem.cancelledAt = Date.now();
+  }
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
   }
 
   renderChallenges();
