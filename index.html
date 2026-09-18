@@ -1192,8 +1192,16 @@ if(historyItem) historyItem.status="Accepted";
 
   renderChallenges();
 }
-function declineChallenge(){
-  
+async function declineChallenge(){
+    if(!currentUser){
+    alert("Please sign in before declining a challenge.");
+    return;
+  }
+
+  if(!challenge || challenge.status !== "Pending" || challenge.challenged !== myTeam){
+    alert("Only the challenged team can decline this challenge.");
+    return;
+  }
   const priorityChallenge = pendingChallenges
   .filter(item => item.challenged === myTeam && item.status === "Pending")
   .sort((a,b) => teamIndex(a.challenger) - teamIndex(b.challenger))[0];
@@ -1241,6 +1249,12 @@ if(historyItem){
 historyItem.status="Decline Pending Admin Review";
   historyItem.declineReason=declineReason;
 }
+     const saved = await saveLadderState();
+
+    if(!saved){
+      await loadLadderState();
+    }
+
     renderChallenges();
 }
 function approveDecline(index){
