@@ -866,8 +866,11 @@ function selectHistoryTeam(value){
 
   renderHistory();
 }
-function issueChallenge(opponentIndex){
-
+async function issueChallenge(opponentIndex){
+  if(!currentUser){
+    alert("Please sign in before issuing a challenge.");
+    return;
+  }
   if(!myTeam) return;
   const opponent = teams[opponentIndex];
 
@@ -929,6 +932,12 @@ challengeHistory.push({
   status: "Pending",
   createdAt: Date.now()
 });
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
   renderChallenges();
 }
 function expireOldChallenges(){
