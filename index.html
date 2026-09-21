@@ -1845,10 +1845,11 @@ function renderPartners(){
               ? "<button class='smallBtn' onclick='sendPartnerInvite(" +
                   index +
                 ")'>🤝 Invite as Partner</button>"
-              : currentUser
-                ? "<span class='muted'>This is your listing.</span>"
-                : "<span class='muted'>Sign in to send an invitation.</span>";
-
+             : currentUser
+  ? "<button class='declineBtn smallBtn' onclick='removePartnerListing(" +
+      index +
+    ")'>Remove My Listing</button>"
+  : "<span class='muted'>Sign in to send an invitation.</span>";
             return "<div class='success'>" +
               "<b>" + player.name + "</b><br>" +
               "Gender: " + player.gender + "<br>" +
@@ -1919,7 +1920,57 @@ function renderPartners(){
         : "<div class='warning'>Sign in to list yourself or contact a partner.</div>"
     );
 }
+async function removePartnerListing(index){
+  if(!currentUser){
+    alert("Please sign in before removing a partner listing.");
+    return;
+  }
 
+  const player = partnerListings[index];
+
+  if(!player){
+    alert("This partner listing could not be found.");
+    return;
+  }
+
+  if(
+    player.userId
+      ? player.userId !== currentUser.id
+      : !isAdmin()
+  ){
+    alert("Only the owner can remove this listing.");
+    return;
+  }
+
+  if(!confirm("Remove your Partner Connect listing?")){
+    return;
+  }
+
+  partnerListings.splice(index, 1);
+
+  partnerInvites.forEach(function(invite){
+    const belongsToListing =
+      invite.status === "Pending" &&
+      (
+        (player.userId && invite.toUserId === player.userId) ||
+        (!player.userId && invite.to === player.name)
+      );
+
+    if(belongsToListing){
+      invite.status = "Cancelled";
+      invite.cancelledAt = Date.now();
+      invite.cancelReason = "Partner listing removed.";
+    }
+  });
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
+  renderPartners();
+}
 function renderPartnerForm(){
 
   const c = document.getElementById("content");
