@@ -1778,53 +1778,81 @@ function expireOldChallenges(){
 }
 
   
-  function renderChallenges(){
-expireOldChallenges();
-  const c=document.getElementById("content");
-const teamChallenges = pendingChallenges.filter(item =>
-  (item.challenger===myTeam || item.challenged===myTeam) &&
- ["Pending","Accepted","Awaiting Confirmation","Decline Pending Admin Review"].includes(item.status)
-);
+function renderChallenges(){
+  expireOldChallenges();
+
+  const c = document.getElementById("content");
+
   if(!myTeam){
-    c.innerHTML=
-      "<h2>My Challenges</h2>"+
+    c.innerHTML =
+      "<h2>My Challenges</h2>" +
       "<p>Please select your team from the Leaderboard first.</p>";
     return;
   }
-  const confirmationChallenge = teamChallenges.find(item =>
-  item.status === "Awaiting Confirmation" &&
-  item.challenged === myTeam
-);
-const incomingChallenges = teamChallenges
-  .filter(item => item.challenged===myTeam && item.status==="Pending")
-  .sort((a,b) => teamIndex(a.challenger) - teamIndex(b.challenger));
 
-if(confirmationChallenge){
-  challenge = confirmationChallenge;
-}else if(incomingChallenges.length){
-  challenge = incomingChallenges[0];
-}else if(teamChallenges.length){
-  challenge = teamChallenges[0];
-}else{
-  challenge = null;
-}
+  const teamLadder = myTeam.ladder || "mens";
+  const ladderTeams = getLadderTeams(teamLadder);
+
+  const teamChallenges = pendingChallenges.filter(item =>
+    (item.challenger === myTeam || item.challenged === myTeam) &&
+    [
+      "Pending",
+      "Accepted",
+      "Awaiting Confirmation",
+      "Decline Pending Admin Review"
+    ].includes(item.status)
+  );
+
+  const confirmationChallenge = teamChallenges.find(item =>
+    item.status === "Awaiting Confirmation" &&
+    item.challenged === myTeam
+  );
+
+  const incomingChallenges = teamChallenges
+    .filter(item =>
+      item.challenged === myTeam &&
+      item.status === "Pending"
+    )
+    .sort(function(a,b){
+      return (
+        ladderTeams.indexOf(a.challenger) -
+        ladderTeams.indexOf(b.challenger)
+      );
+    });
+
+  if(confirmationChallenge){
+    challenge = confirmationChallenge;
+  }else if(incomingChallenges.length){
+    challenge = incomingChallenges[0];
+  }else if(teamChallenges.length){
+    challenge = teamChallenges[0];
+  }else{
+    challenge = null;
+  }
+
   if(!challenge){
-    c.innerHTML=
-      "<h2>My Challenges</h2>"+
-      "<p>No active challenges yet.</p>"+
-      "<p class='muted'>Select your team on the Leaderboard, then challenge a team up to 3 positions above.</p>";
+    c.innerHTML =
+      "<h2>My Challenges</h2>" +
+      "<p>No active challenges yet.</p>" +
+      "<p class='muted'>Select your team on the Leaderboard, then challenge an eligible team above.</p>";
     return;
   }
 
-  if(myTeam!==challenge.challenger && myTeam!==challenge.challenged){
-    c.innerHTML=
-      "<h2>My Challenges</h2>"+
+  if(
+    myTeam !== challenge.challenger &&
+    myTeam !== challenge.challenged
+  ){
+    c.innerHTML =
+      "<h2>My Challenges</h2>" +
       "<p>No active challenge involving this team.</p>";
     return;
   }
 
-  const challengerRank=teamIndex(challenge.challenger)+1;
-  const challengedRank=teamIndex(challenge.challenged)+1;
+  const challengerRank =
+    ladderTeams.indexOf(challenge.challenger) + 1;
+
+  const challengedRank =
+    ladderTeams.indexOf(challenge.challenged) + 1;
 if(challenge.status==="Decline Pending Admin Review"){
   c.innerHTML=
     "<h2>My Challenges</h2>"+
