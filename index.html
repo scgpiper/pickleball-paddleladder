@@ -2814,17 +2814,23 @@ function renderPartnerForm(){
     "<p><b>Name</b><br>" +
     "<input id='partnerName' placeholder='Your name' style='width:100%;padding:10px;'></p>" +
 
-    "<p><b>Gender</b><br>" +
-    "<select id='partnerGender' style='width:100%;padding:10px;'>" +
-      "<option value='Male'>Male</option>" +
-      "<option value='Female'>Female</option>" +
-    "</select></p>" +
+   "<p><b>Gender</b><br>" +
+"<select id='partnerGender' style='width:100%;padding:10px;'>" +
+  (
+    currentLadder === "mens"
+      ? "<option value='Male'>Male</option>"
+      : currentLadder === "womens"
+        ? "<option value='Female'>Female</option>"
+        : "<option value='Male'>Male</option>" +
+          "<option value='Female'>Female</option>"
+  ) +
+"</select></p>" +
 
     "<p><b>DUPR</b><br>" +
     "<input id='partnerDupr' type='number' step='0.01' placeholder='Example: 4.25' style='width:100%;padding:10px;'></p>" +
 
     "<p><b>Looking for</b><br>" +
-    "<select id='partnerLadder' style='width:100%;padding:10px;'>" +
+    "<select id='partnerLadder' disabled style='width:100%;padding:10px;'>" +
      "<option value='mens' " +
   (currentLadder === "mens" ? "selected" : "") +
   ">Men's Ladder</option>" +
@@ -2852,7 +2858,15 @@ async function savePartnerListing(){
   const gender = document.getElementById("partnerGender").value;
   const dupr = document.getElementById("partnerDupr").value;
   const ladder = document.getElementById("partnerLadder").value;
+if(ladder === "mens" && gender !== "Male"){
+  alert("The Men's Ladder is available only to male players.");
+  return;
+}
 
+if(ladder === "womens" && gender !== "Female"){
+  alert("The Women's Ladder is available only to female players.");
+  return;
+}
   if(!name || !dupr){
     alert("Please complete your name and DUPR.");
     return;
@@ -2907,10 +2921,75 @@ async function sendPartnerInvite(index){
     return;
   }
 
+  const normalizedSenderGender =
+    senderGender.trim().toLowerCase();
+
+  if(
+    normalizedSenderGender !== "male" &&
+    normalizedSenderGender !== "female"
+  ){
+    alert("Please enter Male or Female.");
+    return;
+  }
+
+  const senderGenderDisplay =
+    normalizedSenderGender === "male"
+      ? "Male"
+      : "Female";
+
+  const listingGender =
+    String(player.gender).trim().toLowerCase();
+
+  const listingLadder = player.ladder || "mens";
+
+  if(
+    listingLadder === "mens" &&
+    (
+      normalizedSenderGender !== "male" ||
+      listingGender !== "male"
+    )
+  ){
+    alert("Men's teams must contain two male players.");
+    return;
+  }
+
+  if(
+    listingLadder === "womens" &&
+    (
+      normalizedSenderGender !== "female" ||
+      listingGender !== "female"
+    )
+  ){
+    alert("Women's teams must contain two female players.");
+    return;
+  }
+
+  if(
+    listingLadder === "mixed" &&
+    normalizedSenderGender === listingGender
+  ){
+    alert("Mixed teams must contain one male and one female player.");
+    return;
+  }
+
+  const normalizedSenderDupr = senderDupr.trim();
+
+  if(
+    normalizedSenderDupr.toUpperCase() !== "NR" &&
+    (
+      isNaN(parseFloat(normalizedSenderDupr)) ||
+      parseFloat(normalizedSenderDupr) <= 0
+    )
+  ){
+    alert("Please enter a valid DUPR or NR.");
+    return;
+  }
+
+  
   partnerInvites.push({
     from: senderName.trim(),
-    fromDupr: senderDupr.trim(),
-    fromGender: senderGender.trim(),
+fromDupr: normalizedSenderDupr,
+fromGender: senderGenderDisplay,
     fromUserId: currentUser.id,
     fromEmail: currentUser.email,
     to: player.name,
@@ -2918,7 +2997,7 @@ async function sendPartnerInvite(index){
     toDupr: player.dupr,
     toUserId: player.userId || null,
     toEmail: player.email || null,
-    ladder: player.ladder,
+    ladder: listingLadder,
     status: "Pending",
     createdAt: Date.now()
   });
