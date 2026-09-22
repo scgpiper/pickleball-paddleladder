@@ -1132,22 +1132,41 @@ if(mine && isAdmin()){
 }
 function renderHistory(){
   const c = document.getElementById("content");
+  const historyTeams = getLadderTeams(currentLadder);
 
-  if(!teams.length){
+  const ladderSelector =
+    "<p><b>Choose a ladder</b></p>" +
+    "<select onchange='selectHistoryLadder(this.value)' " +
+      "style='width:100%;padding:12px;font-size:16px;'>" +
+      "<option value='mens' " +
+        (currentLadder === "mens" ? "selected" : "") +
+        ">Men's Ladder</option>" +
+      "<option value='womens' " +
+        (currentLadder === "womens" ? "selected" : "") +
+        ">Women's Ladder</option>" +
+      "<option value='mixed' " +
+        (currentLadder === "mixed" ? "selected" : "") +
+        ">Mixed Ladder</option>" +
+    "</select>";
+
+  if(!historyTeams.length){
     c.innerHTML =
       "<h2>📊 History / Stats</h2>" +
-      "<p>No teams are currently on the ladder.</p>";
+      ladderSelector +
+      "<p>No teams are currently on this ladder.</p>";
     return;
   }
 
-  let selectedTeam = historyTeam || myTeam || teams[0];
+  let selectedTeam =
+    historyTeams.includes(historyTeam)
+      ? historyTeam
+      : historyTeams.includes(myTeam)
+        ? myTeam
+        : historyTeams[0];
 
-  if(!teams.includes(selectedTeam)){
-    selectedTeam = teams[0];
-    historyTeam = selectedTeam;
-  }
+  historyTeam = selectedTeam;
 
-  const rank = teamIndex(selectedTeam) + 1;
+  const rank = historyTeams.indexOf(selectedTeam) + 1;
 
   const duprDisplay =
     selectedTeam.isNR || String(selectedTeam.dupr).toUpperCase() === "NR"
@@ -1166,35 +1185,42 @@ function renderHistory(){
     item.challenger === selectedTeam.name ||
     item.challenged === selectedTeam.name
   );
-const movementHistory = ladderMovementHistory.filter(item =>
-  item.team === selectedTeam.name
-);
 
-const netMovement = movementHistory.reduce(function(total,item){
-  return total + (item.fromRank - item.toRank);
-},0);
+  const selectedLadder = selectedTeam.ladder || "mens";
 
-const movementSummary =
-  netMovement > 0
-    ? "+" + netMovement + " position" + (netMovement === 1 ? "" : "s")
-    : netMovement < 0
-      ? Math.abs(netMovement) + " position" +
-        (Math.abs(netMovement) === 1 ? "" : "s") + " down"
-      : "No movement yet";
+  const movementHistory = ladderMovementHistory.filter(item =>
+    item.team === selectedTeam.name &&
+    (item.ladder || "mens") === selectedLadder
+  );
 
-const movementHtml = movementHistory.length
-  ? movementHistory.map(function(item){
-      return "<p><b>#" + item.fromRank + " → #" + item.toRank +
-        "</b><br>" + item.reason + "</p>";
-    }).join("")
-  : "<p>No ladder movement recorded yet.</p>";
-  const options = teams.map(function(team,index){
-    return "<option value='" + index + "' " +
+  const netMovement = movementHistory.reduce(function(total,item){
+    return total + (item.fromRank - item.toRank);
+  },0);
+
+  const movementSummary =
+    netMovement > 0
+      ? "+" + netMovement + " position" +
+        (netMovement === 1 ? "" : "s")
+      : netMovement < 0
+        ? Math.abs(netMovement) + " position" +
+          (Math.abs(netMovement) === 1 ? "" : "s") + " down"
+        : "No movement yet";
+
+  const movementHtml = movementHistory.length
+    ? movementHistory.map(function(item){
+        return "<p><b>#" + item.fromRank + " → #" + item.toRank +
+          "</b><br>" + item.reason + "</p>";
+      }).join("")
+    : "<p>No ladder movement recorded yet.</p>";
+
+  const options = historyTeams.map(function(team,index){
+    const mainIndex = teamIndex(team);
+
+    return "<option value='" + mainIndex + "' " +
       (team === selectedTeam ? "selected" : "") + ">" +
       "#" + (index + 1) + " — " + team.name +
       "</option>";
   }).join("");
-
   const historyHtml = teamHistory.length
     ? teamHistory.map(function(item){
         return "<p><b>" + item.challenger + "</b> → <b>" +
@@ -1205,9 +1231,10 @@ const movementHtml = movementHistory.length
       }).join("")
     : "<p>No challenge history yet.</p>";
 
-  c.innerHTML =
-    "<h2>📊 History / Stats</h2>" +
-    "<p><b>View team</b></p>" +
+ c.innerHTML =
+  "<h2>📊 History / Stats</h2>" +
+  ladderSelector +
+  "<p><b>View team</b></p>" +
     "<select onchange='selectHistoryTeam(this.value)' " +
       "style='width:100%;padding:12px;font-size:16px;'>" +
       options +
@@ -1593,6 +1620,17 @@ function selectTeam(value){
   myTeam = selectedTeam;
   renderBoard();
 }
+
+ function selectHistoryLadder(value){
+  if(!["mens","womens","mixed"].includes(value)){
+    return;
+  }
+
+  currentLadder = value;
+  historyTeam = null;
+  renderHistory();
+} 
+  
 function selectHistoryTeam(value){
   if(value === ""){
     historyTeam = null;
