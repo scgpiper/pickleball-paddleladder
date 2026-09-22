@@ -642,7 +642,16 @@ function eligibleChallengeIndexes(team){
     alert("Only a team member or Admin can change this team's Away status.");
     return;
   }
+  const teamLadder = team.ladder || "mens";
+  const ladderTeams = getLadderTeams(teamLadder);
+  const ladderIndex = ladderTeams.indexOf(team);
 
+  if(ladderIndex >= 0 && ladderIndex < 10){
+    alert(
+      "Teams ranked in the Top 10 cannot mark themselves Away."
+    );
+    return;
+  }
   const openChallenge = pendingChallenges.find(function(item){
     return (
       [
@@ -806,7 +815,7 @@ function show(page){
       "<p><b>Challenge:</b> Teams in the Top 10, or teams challenging to enter the Top 10, may challenge up to 2 positions above. Teams below the Top 10 may challenge up to 3 positions above.</p>"+
      "<p><b>Challenge response:</b> A team has 72 hours to accept or decline a challenge. If no response is received, the challenge goes to Admin Review.</p>"+
       "<p><b>Open challenges:</b> A team may have only one open challenge at a time. Another challenge may be issued after the current challenge is closed.</p>"+
-      "<p><b>Away status:</b> A team with no open challenge may mark itself Away for up to 30 days. Away teams cannot issue or receive challenges and are skipped when determining eligible opponents. After 30 days, Admin may reactivate the team, extend the Away period, or remove the team from the ladder.</p>"+
+     "<p><b>Away status:</b> Teams ranked #11 or lower with no open challenge may mark themselves Away for up to 30 days. Top 10 teams cannot use Away status. Away teams cannot issue or receive challenges and are skipped when determining eligible opponents. After 30 days, Admin may reactivate the team, extend the Away period, or remove the team from the ladder.</p>"+
 "<p><b>Declines:</b> A decline goes to Admin Review. If Admin approves the reason, no ranking change occurs. If Admin rejects the reason, the declining team drops one position.</p>"+
 "<p><b>Play deadline:</b> Once accepted, the match must be completed within 7 days. If not completed, it becomes Overdue and goes to Admin Review.</p>"+
       "<p><b>Overdue matches:</b> Admin may extend the match another 7 days, record a forfeit, or cancel the match. A cancelled overdue match causes no win, loss, or ranking movement.</p>"+
@@ -1113,7 +1122,7 @@ if(teamAway){
 
   html += "<span class='muted'>Your team</span>";
 
-  if(canChangeAway && !challengeBusy){
+  if(canChangeAway && !challengeBusy && ladderIndex >= 10){
     html +=
       "<br><button class='smallBtn' onclick='setTeamAway("+i+")'>Mark Away</button>";
   }
