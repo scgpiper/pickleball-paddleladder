@@ -2602,9 +2602,30 @@ function cancelInvalidPendingChallenges(){
 function renderPartners(){
   const c = document.getElementById("content");
 
-  const pendingInvites = partnerInvites.filter(function(invite){
-    return invite.status === "Pending";
-  });
+  const visibleListings = partnerListings
+    .map(function(player,index){
+      return {
+        player: player,
+        index: index
+      };
+    })
+    .filter(function(entry){
+      return (entry.player.ladder || "mens") === currentLadder;
+    });
+
+  const pendingInvites = partnerInvites
+    .map(function(invite,index){
+      return {
+        invite: invite,
+        index: index
+      };
+    })
+    .filter(function(entry){
+      return (
+        entry.invite.status === "Pending" &&
+        (entry.invite.ladder || "mens") === currentLadder
+      );
+    });
 
   c.innerHTML =
     "<h2>🤝 Partner Connect</h2>" +
@@ -2612,10 +2633,17 @@ function renderPartners(){
 
     "<div class='info'>" +
       "<b>Which ladder are you interested in?</b><br><br>" +
-      "<select id='partnerLadder' style='width:100%;padding:12px;font-size:16px;'>" +
-        "<option value='mens'>Men's Ladder</option>" +
-        "<option value='womens'>Women's Ladder</option>" +
-        "<option value='mixed'>Mixed Ladder</option>" +
+      "<select onchange='selectPartnerLadder(this.value)' " +
+        "style='width:100%;padding:12px;font-size:16px;'>" +
+        "<option value='mens' " +
+          (currentLadder === "mens" ? "selected" : "") +
+          ">Men's Ladder</option>" +
+        "<option value='womens' " +
+          (currentLadder === "womens" ? "selected" : "") +
+          ">Women's Ladder</option>" +
+        "<option value='mixed' " +
+          (currentLadder === "mixed" ? "selected" : "") +
+          ">Mixed Ladder</option>" +
       "</select>" +
     "</div>" +
 
@@ -2623,9 +2651,12 @@ function renderPartners(){
     "<h3>Players Looking for Partners</h3>" +
 
     (
-      partnerListings.length === 0
-        ? "<div class='warning'><b>No players are currently looking for a partner.</b></div>"
-        : partnerListings.map(function(player,index){
+      visibleListings.length === 0
+        ? "<div class='warning'><b>No players are currently looking for a partner in this ladder.</b></div>"
+        : visibleListings.map(function(entry){
+            const player = entry.player;
+            const index = entry.index;
+
             const canInvite =
               currentUser &&
               (!player.userId || player.userId !== currentUser.id);
@@ -2634,11 +2665,12 @@ function renderPartners(){
               ? "<button class='smallBtn' onclick='sendPartnerInvite(" +
                   index +
                 ")'>🤝 Invite as Partner</button>"
-             : currentUser
-  ? "<button class='declineBtn smallBtn' onclick='removePartnerListing(" +
-      index +
-    ")'>Remove My Listing</button>"
-  : "<span class='muted'>Sign in to send an invitation.</span>";
+              : currentUser
+                ? "<button class='declineBtn smallBtn' onclick='removePartnerListing(" +
+                    index +
+                  ")'>Remove My Listing</button>"
+                : "<span class='muted'>Sign in to send an invitation.</span>";
+
             return "<div class='success'>" +
               "<b>" + player.name + "</b><br>" +
               "Gender: " + player.gender + "<br>" +
@@ -2654,9 +2686,10 @@ function renderPartners(){
 
     (
       pendingInvites.length === 0
-        ? "<div class='warning'><b>No pending partner invites.</b></div>"
-        : partnerInvites.map(function(invite,index){
-            if(invite.status !== "Pending") return "";
+        ? "<div class='warning'><b>No pending partner invites in this ladder.</b></div>"
+        : pendingInvites.map(function(entry){
+            const invite = entry.invite;
+            const index = entry.index;
 
             const canRespond =
               currentUser &&
@@ -2709,6 +2742,16 @@ function renderPartners(){
         : "<div class='warning'>Sign in to list yourself or contact a partner.</div>"
     );
 }
+
+function selectPartnerLadder(value){
+  if(!["mens","womens","mixed"].includes(value)){
+    return;
+  }
+
+  currentLadder = value;
+  renderPartners();
+}
+  
 async function removePartnerListing(index){
   if(!currentUser){
     alert("Please sign in before removing a partner listing.");
@@ -2782,9 +2825,15 @@ function renderPartnerForm(){
 
     "<p><b>Looking for</b><br>" +
     "<select id='partnerLadder' style='width:100%;padding:10px;'>" +
-      "<option value='mens'>Men's Ladder</option>" +
-      "<option value='womens'>Women's Ladder</option>" +
-      "<option value='mixed'>Mixed Ladder</option>" +
+     "<option value='mens' " +
+  (currentLadder === "mens" ? "selected" : "") +
+  ">Men's Ladder</option>" +
+"<option value='womens' " +
+  (currentLadder === "womens" ? "selected" : "") +
+  ">Women's Ladder</option>" +
+"<option value='mixed' " +
+  (currentLadder === "mixed" ? "selected" : "") +
+  ">Mixed Ladder</option>" +
     "</select></p>" +
 
     
