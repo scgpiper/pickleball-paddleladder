@@ -3076,6 +3076,84 @@ async function acceptPartnerInvite(index){
     return;
   }
 
+  const inviteLadder = invite.ladder || "mens";
+
+  const proposedUserIds = [
+    invite.fromUserId,
+    invite.toUserId
+  ].filter(Boolean);
+
+  const proposedEmails = [
+    invite.fromEmail,
+    invite.toEmail
+  ].filter(Boolean).map(function(email){
+    return String(email).toLowerCase();
+  });
+
+  const existingMembership = teams.find(function(team){
+    if((team.ladder || "mens") !== inviteLadder){
+      return false;
+    }
+
+    const teamUserIds = Array.isArray(team.memberUserIds)
+      ? team.memberUserIds
+      : [];
+
+    const teamEmails = Array.isArray(team.memberEmails)
+      ? team.memberEmails.map(function(email){
+          return String(email).toLowerCase();
+        })
+      : [];
+
+    return (
+      proposedUserIds.some(function(userId){
+        return teamUserIds.includes(userId);
+      }) ||
+      proposedEmails.some(function(email){
+        return teamEmails.includes(email);
+      })
+    );
+  });
+
+  if(existingMembership){
+    alert(
+      "One of these players is already assigned to " +
+      existingMembership.name +
+      " in this ladder."
+    );
+    return;
+  }
+
+  const fromGender =
+    String(invite.fromGender).toLowerCase();
+
+  const toGender =
+    String(invite.toGender).toLowerCase();
+
+  if(
+    inviteLadder === "mens" &&
+    (fromGender !== "male" || toGender !== "male")
+  ){
+    alert("Men's teams must contain two male players.");
+    return;
+  }
+
+  if(
+    inviteLadder === "womens" &&
+    (fromGender !== "female" || toGender !== "female")
+  ){
+    alert("Women's teams must contain two female players.");
+    return;
+  }
+
+  if(
+    inviteLadder === "mixed" &&
+    fromGender === toGender
+  ){
+    alert("Mixed teams must contain one male and one female player.");
+    return;
+  }
+  
   invite.status = "Accepted";
   invite.acceptedAt = Date.now();
 
@@ -3084,7 +3162,7 @@ async function acceptPartnerInvite(index){
     players: invite.from + " / " + invite.to,
     player1Gender: invite.fromGender,
     player2Gender: invite.toGender,
-    ladder: invite.ladder,
+    ladder: inviteLadder,
     dupr: combinedDupr,
     isNR: teamIsNR,
     wins: 0,
