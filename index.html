@@ -834,6 +834,80 @@ function show(page){
   }
 }
 
+async function adminRemoveTeam(index){
+  if(!isAdmin()){
+    alert("Only Admin can remove a team.");
+    return;
+  }
+
+  const team = teams[index];
+
+  if(!team){
+    alert("This team could not be found.");
+    return;
+  }
+
+  const openChallenge = pendingChallenges.find(function(item){
+    return (
+      [
+        "Pending",
+        "Accepted",
+        "Awaiting Confirmation",
+        "Decline Pending Admin Review",
+        "Overdue",
+        "Disputed"
+      ].includes(item.status) &&
+      (item.challenger === team || item.challenged === team)
+    );
+  });
+
+  if(openChallenge){
+    alert(
+      "This team has an open challenge. Close the challenge before removing the team."
+    );
+    return;
+  }
+
+  if(
+    !confirm(
+      "Remove " + team.name +
+      " from the ladder? Teams below it will move up one position."
+    )
+  ){
+    return;
+  }
+
+  const previousRanks = captureTeamRanks();
+
+  teams.splice(index, 1);
+
+  createdTeams = createdTeams.filter(function(createdTeam){
+    return createdTeam !== team;
+  });
+
+  recordLadderMovements(
+    previousRanks,
+    "Team removed by Admin"
+  );
+
+  if(myTeam === team){
+    myTeam = null;
+  }
+
+  if(historyTeam === team){
+    historyTeam = null;
+  }
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+    return;
+  }
+
+  renderBoard();
+}
+  
 async function adminAddTeam(){
   if(!isAdmin()){
     alert("Only Admin can add a team directly.");
@@ -1130,7 +1204,11 @@ if(teamAway){
 if(mine && isAdmin()){
   html +=
     "<br><button class='smallBtn' onclick='assignTeamMembers(" +
-    i + ")'>Assign Player Emails</button>";
+      i +
+    ")'>Assign Player Emails</button> " +
+    "<button class='declineBtn smallBtn' onclick='adminRemoveTeam(" +
+      i +
+    ")'>Remove Team</button>";
 }
     html+="</td></tr>";
   });
