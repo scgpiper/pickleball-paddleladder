@@ -414,6 +414,102 @@ function isAwayReviewDue(team){
 
   return userIdMatch || emailMatch;
 }
+  function userBelongsToTeam(team){
+  if(!currentUser || !team){
+    return false;
+  }
+
+  const userIdMatch =
+    Array.isArray(team.memberUserIds) &&
+    team.memberUserIds.includes(currentUser.id);
+
+  const emailMatch =
+    Array.isArray(team.memberEmails) &&
+    team.memberEmails.some(function(email){
+      return String(email).toLowerCase() ===
+        String(currentUser.email).toLowerCase();
+    });
+
+  return userIdMatch || emailMatch;
+}
+
+function findCurrentUsersTeam(){
+  if(!currentUser){
+    return null;
+  }
+
+  return teams.find(function(team){
+    return userBelongsToTeam(team);
+  }) || null;
+}
+  async function assignTeamMembers(index){
+  if(!isAdmin()){
+    alert("Only Admin can assign player emails to a team.");
+    return;
+  }
+
+  const team = teams[index];
+
+  if(!team){
+    alert("This team could not be found.");
+    return;
+  }
+
+  const existingEmails = Array.isArray(team.memberEmails)
+    ? team.memberEmails
+    : [];
+
+  const playerOneEmail = prompt(
+    "Enter the first player's email for " + team.name + ":",
+    existingEmails[0] || ""
+  );
+
+  if(playerOneEmail === null){
+    return;
+  }
+
+  const playerTwoEmail = prompt(
+    "Enter the second player's email for " + team.name + ":",
+    existingEmails[1] || ""
+  );
+
+  if(playerTwoEmail === null){
+    return;
+  }
+
+  const emails = [
+    playerOneEmail.trim().toLowerCase(),
+    playerTwoEmail.trim().toLowerCase()
+  ].filter(function(email){
+    return email !== "";
+  });
+
+  if(!emails.length){
+    alert("Please enter at least one player email.");
+    return;
+  }
+
+  const invalidEmail = emails.find(function(email){
+    return !email.includes("@");
+  });
+
+  if(invalidEmail){
+    alert("Please enter valid email addresses.");
+    return;
+  }
+
+  team.memberEmails = [...new Set(emails)];
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
+  alert("Player emails saved for " + team.name + ".");
+
+  renderBoard();
+}
   function eligibleChallengeIndexes(team){
   const myIndex = teamIndex(team);
 
@@ -636,12 +732,19 @@ const c=document.getElementById("content");
 
   let options='<option value="">Choose your team...</option>';
 
-  teams.forEach((team,i)=>{
-    options +=
-      '<option value="'+i+'" '+(team===myTeam?'selected':'')+'>'+
-      '#'+(i+1)+' — '+team.name+
-      '</option>';
-  });
+teams.forEach((team,i)=>{
+  const canSelectTeam =
+    isAdmin() || userBelongsToTeam(team);
+
+  if(!canSelectTeam){
+    return;
+  }
+
+  options +=
+    '<option value="'+i+'" '+(team===myTeam?'selected':'')+'>'+
+    '#'+(i+1)+' — '+team.name+
+    '</option>';
+});
   const authHtml = currentUser
     ? "<div class='success'>" +
         "<b>Signed in:</b> " + currentUser.email + "<br><br>" +
@@ -780,7 +883,11 @@ if(teamAway){
       "<br><button class='smallBtn' onclick='setTeamAway("+i+")'>Mark Away</button>";
   }
 }
-
+if(mine && isAdmin()){
+  html +=
+    "<br><button class='smallBtn' onclick='assignTeamMembers(" +
+    i + ")'>Assign Player Emails</button>";
+}
     html+="</td></tr>";
   });
 
@@ -1207,13 +1314,32 @@ async function cancelOverdueMatch(index){
   renderAdminReview();
 }
 function selectTeam(value){
+  if(value === ""){
+    myTeam =
+      currentUser && !isAdmin()
+        ? findCurrentUsersTeam()
+        : null;
 
-  if(value===""){
-    myTeam=null;
-  }else{
-    myTeam=teams[parseInt(value)];
+    renderBoard();
+    return;
   }
 
+  const selectedTeam = teams[parseInt(value)];
+
+  if(!selectedTeam){
+    alert("This team could not be found.");
+    renderBoard();
+    return;
+  }
+
+  if(!isAdmin() && !userBelongsToTeam(selectedTeam)){
+    alert("You can only select the team assigned to your account.");
+    myTeam = findCurrentUsersTeam();
+    renderBoard();
+    return;
+  }
+
+  myTeam = selectedTeam;
   renderBoard();
 }
 function selectHistoryTeam(value){
@@ -1230,7 +1356,10 @@ async function issueChallenge(opponentIndex){
     alert("Please sign in before issuing a challenge.");
     return;
   }
-  if(!myTeam) return;
+if(!myTeam || !canManageTeam(myTeam)){
+  alert("Your account is not assigned to this team.");
+  return;
+}
   const opponent = teams[opponentIndex];
 
 const opponentActiveMatch = pendingChallenges.find(item =>
@@ -1517,8 +1646,13 @@ if(challenge.status==="Decline Pending Admin Review"){
 }
 
 async function acceptChallenge(){
-    if(!currentUser){
+  if(!currentUser){
     alert("Please sign in before accepting a challenge.");
+    return;
+  }
+
+  if(!canManageTeam(myTeam)){
+    alert("Your account is not assigned to this team.");
     return;
   }
 
@@ -1561,8 +1695,13 @@ if(historyItem) historyItem.status="Accepted";
   renderChallenges();
 }
 async function declineChallenge(){
-    if(!currentUser){
+  if(!currentUser){
     alert("Please sign in before declining a challenge.");
+    return;
+  }
+
+  if(!canManageTeam(myTeam)){
+    alert("Your account is not assigned to this team.");
     return;
   }
 
@@ -1723,6 +1862,10 @@ async function cancelChallenge(){
     alert("Please sign in before cancelling a challenge.");
     return;
   }
+  if(!canManageTeam(myTeam)){
+  alert("Your account is not assigned to this team.");
+  return;
+}
   if(!challenge || challenge.status !== "Pending" || challenge.challenger !== myTeam){
     alert("Only the challenger can cancel a pending challenge.");
     return;
@@ -1836,6 +1979,11 @@ async function submitResult(){
     return;
   }
 
+  if(!canManageTeam(myTeam)){
+    alert("Your account is not assigned to this team.");
+    return;
+  }
+
   if(
     !challenge ||
     challenge.status !== "Accepted" ||
@@ -1946,7 +2094,10 @@ async function confirmResult(){
     alert("Please sign in before confirming a result.");
     return;
   }
-
+if(!canManageTeam(myTeam)){
+  alert("Your account is not assigned to this team.");
+  return;
+}
   if(
     !challenge ||
     challenge.status !== "Awaiting Confirmation" ||
@@ -1990,7 +2141,10 @@ async function disputeResult(){
     alert("Please sign in before disputing a result.");
     return;
   }
-
+if(!canManageTeam(myTeam)){
+  alert("Your account is not assigned to this team.");
+  return;
+}
   if(
     !challenge ||
     challenge.status !== "Awaiting Confirmation" ||
@@ -2028,7 +2182,10 @@ async function resetResult(){
     alert("Please sign in before re-entering a result.");
     return;
   }
-
+if(!canManageTeam(myTeam)){
+  alert("Your account is not assigned to this team.");
+  return;
+}
   if(
     !challenge ||
     challenge.status !== "Disputed" ||
@@ -2580,10 +2737,15 @@ async function cancelPartnerInvite(index){
   
 async function startApp(){
   await loadCurrentUser();
-  await loadLadderState();
+await loadLadderState();
 
-  const deadlineChanges = expireOldChallenges();
+if(!currentUser){
+  myTeam = null;
+}else if(!isAdmin()){
+  myTeam = findCurrentUsersTeam();
+}
 
+const deadlineChanges = expireOldChallenges();
   if(deadlineChanges && currentUser){
     const saved = await saveLadderState();
 
