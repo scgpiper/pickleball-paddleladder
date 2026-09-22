@@ -166,18 +166,11 @@ const dbClient = window.supabase.createClient(
   SUPABASE_PUBLISHABLE_KEY
 );
 let currentUser = null;
-  const ADMIN_EMAILS = [
-  "scgpiper@gmail.com"
-];
+let currentUserIsAdmin = false;
 
 function isAdmin(){
-  if(!currentUser || !currentUser.email) return false;
-
-  return ADMIN_EMAILS.includes(
-    currentUser.email.toLowerCase()
-  );
+  return Boolean(currentUser && currentUserIsAdmin);
 }
-let ladderStateVersion = 1;
 async function loadCurrentUser(){
   const { data, error } = await dbClient.auth.getSession();
 
@@ -187,6 +180,21 @@ async function loadCurrentUser(){
   }
 
   currentUser = data.session ? data.session.user : null;
+
+  if(!currentUser){
+    currentUserIsAdmin = false;
+    return;
+  }
+
+  const adminCheck = await dbClient.rpc("is_app_admin");
+
+  if(adminCheck.error){
+    console.error("Could not check administrator access:", adminCheck.error);
+    currentUserIsAdmin = false;
+    return;
+  }
+
+  currentUserIsAdmin = adminCheck.data === true;
 }
 
 async function signInWithEmail(){
@@ -220,110 +228,203 @@ async function signOutUser(){
   }
 
   currentUser = null;
+  currentUserIsAdmin = false;
+  myTeam = null;
   renderBoard();
 }
-async function loadLadderState(){
-  const { data, error } = await dbClient
-    .from("ladder_state")
-    .select("*")
-    .eq("id", 1)
-    .single();
 
-  if(error){
-    console.error("Supabase connection failed:", error);
-    alert("Database connection failed: " + error.message);
-    return;
-  }
+function timestampToMilliseconds(value){
+  if(!value) return null;
 
-  console.log("Supabase connected:", data);
-  ladderStateVersion = Number(data.version) || 1;
-  // Keep the current built-in teams when the database is still empty.
-  if(!Array.isArray(data.teams) || data.teams.length === 0){
-    console.log("Database is empty. Current leaderboard retained.");
-    return;
-  }
-
-  const selectedTeamName = myTeam ? myTeam.name : null;
-  const historyTeamName = historyTeam ? historyTeam.name : null;
-
- teams = data.teams.map(function(team){
-  if(!team.ladder){
-    team.ladder = "mens";
-  }
-
-  return team;
-});
-  pendingChallenges =
-    restoreChallengeTeamReferences(data.pending_challenges);
-  challengeHistory = Array.isArray(data.challenge_history)
-    ? data.challenge_history
-    : [];
-  matchHistory = Array.isArray(data.match_history)
-    ? data.match_history
-    : [];
-  partnerListings = Array.isArray(data.partner_listings)
-    ? data.partner_listings
-    : [];
-  partnerInvites = Array.isArray(data.partner_invites)
-    ? data.partner_invites
-    : [];
-  ladderMovementHistory = Array.isArray(data.ladder_movement_history)
-    ? data.ladder_movement_history
-    : [];
-
-  myTeam = selectedTeamName
-    ? findTeamFromSavedValue(selectedTeamName)
-    : null;
-
-  historyTeam = historyTeamName
-    ? findTeamFromSavedValue(historyTeamName)
-    : null;
-
-  challenge = null;
-
-  console.log("Ladder information loaded from Supabase.");
+  const milliseconds = new Date(value).getTime();
+  return Number.isNaN(milliseconds) ? null : milliseconds;
 }
-async function saveLadderState(){
-  if(!currentUser){
-    alert("Please sign in before making ladder changes.");
+
+function showDatabaseError(action,error){
+  console.error(action + " failed:", error);
+  alert(action + " failed: " + (error && error.message ? error.message : "Unknown error"));
+}
+
+async function callSecureFunction(functionName,args,actionLabel){
+  const result = await dbClient.rpc(functionName,args || {});
+
+  if(result.error){
+    showDatabaseError(actionLabel,result.error);
     return false;
   }
 
-  const nextVersion = ladderStateVersion + 1;
-
-  const { data, error } = await dbClient
-    .from("ladder_state")
-    .update({
-      teams: teams,
-      pending_challenges: pendingChallenges,
-      challenge_history: challengeHistory,
-      match_history: matchHistory,
-      partner_listings: partnerListings,
-      partner_invites: partnerInvites,
-      ladder_movement_history: ladderMovementHistory,
-      version: nextVersion,
-      updated_at: new Date().toISOString()
-    })
-    .eq("id", 1)
-    .eq("version", ladderStateVersion)
-    .select("version");
-
-  if(error){
-    console.error("Could not save ladder:", error);
-    alert("The ladder could not be saved: " + error.message);
-    return false;
-  }
-
-  if(!data || data.length === 0){
-    alert(
-      "Someone else updated the ladder first. Refresh the page before trying again."
-    );
-    return false;
-  }
-
-  ladderStateVersion = data[0].version;
-  console.log("Ladder saved to Supabase.");
+  await loadLadderState();
   return true;
+}
+
+async function loadLadderState(){
+  const selectedTeamId = myTeam ? myTeam.id : null;
+  const historyTeamId = historyTeam ? historyTeam.id : null;
+
+  const results = await Promise.all([
+    dbClient.from("ladder_teams").select("*").order("ladder").order("rank_position"),
+    dbClient.from("challenges").select("*").order("created_at", { ascending: false }),
+    dbClient.from("ladder_movements").select("*").order("created_at", { ascending: false }),
+    dbClient.from("partner_listings").select("*").eq("status", "Active").order("created_at", { ascending: false }),
+    currentUser
+      ? dbClient.from("partner_invites").select("*").order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null })
+  ]);
+
+  const failedResult = results.find(function(result){
+    return result.error;
+  });
+
+  if(failedResult){
+    showDatabaseError("Loading ladder information",failedResult.error);
+    return false;
+  }
+
+  teams = (results[0].data || []).map(function(row){
+    return {
+      id: row.id,
+      name: row.name,
+      players: row.players,
+      ladder: row.ladder || "mens",
+      rankPosition: row.rank_position,
+      dupr: row.is_nr ? "NR" : row.dupr,
+      isNR: row.is_nr === true,
+      wins: Number(row.wins) || 0,
+      losses: Number(row.losses) || 0,
+      away: row.away === true,
+      awayStartedAt: timestampToMilliseconds(row.away_started_at),
+      awayReviewAt: timestampToMilliseconds(row.away_review_at),
+      belongsToCurrentUser: false
+    };
+  });
+
+  if(currentUser && !isAdmin()){
+    const membershipChecks = await Promise.all(
+      teams.map(function(team){
+        return dbClient.rpc("user_belongs_to_team", { requested_team_id: team.id });
+      })
+    );
+
+    membershipChecks.forEach(function(result,index){
+      if(result.error){
+        console.error("Could not check team membership:",result.error);
+        return;
+      }
+
+      teams[index].belongsToCurrentUser = result.data === true;
+    });
+  }
+
+  const teamById = new Map(teams.map(function(team){
+    return [team.id,team];
+  }));
+
+  const allChallenges = (results[1].data || []).map(function(row){
+    return {
+      id: row.id,
+      ladder: row.ladder || "mens",
+      challenger: teamById.get(row.challenger_team_id) || null,
+      challenged: teamById.get(row.challenged_team_id) || null,
+      status: row.status,
+      createdAt: timestampToMilliseconds(row.created_at),
+      acceptedAt: timestampToMilliseconds(row.accepted_at),
+      playBy: timestampToMilliseconds(row.play_by),
+      completedAt: timestampToMilliseconds(row.completed_at),
+      cancelledAt: timestampToMilliseconds(row.cancelled_at),
+      declinedAt: timestampToMilliseconds(row.declined_at),
+      disputedAt: timestampToMilliseconds(row.disputed_at),
+      declineReason: row.decline_reason || null,
+      scores: row.scores || null,
+      submittedBy: teamById.get(row.submitted_by_team_id) || null,
+      winner: teamById.get(row.winner_team_id) || null,
+      forfeit: row.forfeit === true
+    };
+  }).filter(function(item){
+    return item.challenger && item.challenged;
+  });
+
+  pendingChallenges = allChallenges;
+  challengeHistory = allChallenges.map(function(item){
+    return {
+      challenger: item.challenger.name,
+      challenged: item.challenged.name,
+      status: item.status,
+      declineReason: item.declineReason,
+      createdAt: item.createdAt,
+      completedAt: item.completedAt,
+      cancelledAt: item.cancelledAt
+    };
+  });
+  matchHistory = allChallenges.filter(function(item){
+    return item.status === "Completed";
+  }).map(function(item){
+    return {
+      teamA: item.challenger.name,
+      teamB: item.challenged.name,
+      completedAt: item.completedAt,
+      forfeit: item.forfeit
+    };
+  });
+  ladderMovementHistory = (results[2].data || []).map(function(row){
+    const movementTeam = teamById.get(row.team_id);
+    return {
+      team: movementTeam ? movementTeam.name : "Removed team",
+      ladder: row.ladder || "mens",
+      fromRank: row.from_rank,
+      toRank: row.to_rank,
+      reason: row.reason,
+      changedAt: timestampToMilliseconds(row.created_at)
+    };
+  });
+  partnerListings = (results[3].data || []).map(function(row){
+    return {
+      id: row.id,
+      name: row.name,
+      gender: row.gender,
+      dupr: row.is_nr ? "NR" : row.dupr,
+      isNR: row.is_nr === true,
+      ladder: row.ladder || "mens",
+      userId: row.owner_user_id,
+      status: row.status
+    };
+  });
+  partnerInvites = (results[4].data || []).map(function(row){
+    return {
+      id: row.id,
+      listingId: row.listing_id,
+      from: row.sender_name,
+      to: row.recipient_name,
+      fromGender: row.sender_gender,
+      toGender: row.recipient_gender,
+      fromDupr: row.sender_is_nr ? "NR" : row.sender_dupr,
+      toDupr: row.recipient_is_nr ? "NR" : row.recipient_dupr,
+      fromUserId: row.sender_user_id,
+      toUserId: row.recipient_user_id,
+      ladder: row.ladder || "mens",
+      status: row.status,
+      createdAt: timestampToMilliseconds(row.created_at)
+    };
+  });
+
+  myTeam = selectedTeamId
+    ? teamById.get(selectedTeamId) || null
+    : null;
+  historyTeam = historyTeamId
+    ? teamById.get(historyTeamId) || null
+    : null;
+  challenge = challenge
+    ? allChallenges.find(function(item){ return item.id === challenge.id; }) || null
+    : null;
+
+  console.log("Secure ladder information loaded from Supabase.");
+  return true;
+}
+
+async function saveLadderState(){
+  console.warn("Legacy ladder_state writes are disabled.");
+  alert("This older admin action is temporarily unavailable during the secure database upgrade.");
+  await loadLadderState();
+  return false;
 }
 
 let teams = [
@@ -422,7 +523,7 @@ function isAwayReviewDue(team){
 
   return Date.now() - Number(team.awayStartedAt) >= thirtyDays;
 }
-  function canManageTeam(team){
+function canManageTeam(team){
   if(!currentUser || !team){
     return false;
   }
@@ -431,36 +532,14 @@ function isAwayReviewDue(team){
     return true;
   }
 
-  const userIdMatch =
-    Array.isArray(team.memberUserIds) &&
-    team.memberUserIds.includes(currentUser.id);
-
-  const emailMatch =
-    Array.isArray(team.memberEmails) &&
-    team.memberEmails.some(function(email){
-      return String(email).toLowerCase() ===
-        String(currentUser.email).toLowerCase();
-    });
-
-  return userIdMatch || emailMatch;
+  return team.belongsToCurrentUser === true;
 }
   function userBelongsToTeam(team){
   if(!currentUser || !team){
     return false;
   }
 
-  const userIdMatch =
-    Array.isArray(team.memberUserIds) &&
-    team.memberUserIds.includes(currentUser.id);
-
-  const emailMatch =
-    Array.isArray(team.memberEmails) &&
-    team.memberEmails.some(function(email){
-      return String(email).toLowerCase() ===
-        String(currentUser.email).toLowerCase();
-    });
-
-  return userIdMatch || emailMatch;
+  return team.belongsToCurrentUser === true;
 }
 
 function findCurrentUsersTeam(){
@@ -675,19 +754,13 @@ function eligibleChallengeIndexes(team){
     return;
   }
 
-  team.away = true;
-  team.awayStartedAt = Date.now();
-  team.awayReviewAt =
-    team.awayStartedAt +
-    MAX_AWAY_DAYS * 24 * 60 * 60 * 1000;
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "set_team_away_secure",
+    { requested_team_id: team.id, requested_away: true },
+    "Setting Away status"
+  )){
+    renderBoard();
   }
-
-  renderBoard();
 }
   async function returnTeamFromAway(index){
   if(!currentUser){
@@ -711,17 +784,13 @@ function eligibleChallengeIndexes(team){
     return;
   }
 
-  team.away = false;
-  team.awayStartedAt = null;
-  team.awayReviewAt = null;
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "set_team_away_secure",
+    { requested_team_id: team.id, requested_away: false },
+    "Returning team to active status"
+  )){
+    renderBoard();
   }
-
-  renderBoard();
 }
   function restoreChallengeTeamReferences(items){
   if(!Array.isArray(items)) return [];
@@ -1072,12 +1141,6 @@ function renderBoard(){
     assignmentHtml +
     "<p><b>Which team are you?</b></p>" +
     "<select onchange='selectTeam(this.value)'>" + options + "</select>";
-if(isAdmin()){
-  html +=
-    "<br><br><button class='smallBtn' onclick='adminAddTeam()'>" +
-      "➕ Add Team to This Ladder" +
-    "</button>";
-}
   const myIndex = myTeam ? ladderTeams.indexOf(myTeam) : -1;
 if(myIndex >= 0){
   const noticeIndexes = eligibleChallengeIndexes(myTeam);
@@ -1200,15 +1263,6 @@ if(teamAway){
     html +=
       "<br><button class='smallBtn' onclick='setTeamAway("+i+")'>Mark Away</button>";
   }
-}
-if(mine && isAdmin()){
-  html +=
-    "<br><button class='smallBtn' onclick='assignTeamMembers(" +
-      i +
-    ")'>Assign Player Emails</button> " +
-    "<button class='declineBtn smallBtn' onclick='adminRemoveTeam(" +
-      i +
-    ")'>Remove Team</button>";
 }
     html+="</td></tr>";
   });
@@ -1392,9 +1446,7 @@ reviews.forEach((item,index)=>{
       "<button class='acceptBtn smallBtn' onclick='adminReactivateAway(" +
         index + ")'>Reactivate Team</button> " +
       "<button class='smallBtn' onclick='extendAwayStatus(" +
-        index + ")'>Extend Away 30 Days</button> " +
-      "<button class='declineBtn smallBtn' onclick='removeAwayTeam(" +
-        index + ")'>Remove Team</button>" +
+        index + ")'>Extend Away 30 Days</button>" +
     "</div>";
 });
 }
@@ -1415,17 +1467,13 @@ reviews.forEach((item,index)=>{
     return;
   }
 
-  team.away = false;
-  team.awayStartedAt = null;
-  team.awayReviewAt = null;
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "review_away_team_secure",
+    { requested_team_id: team.id, requested_action: "Reactivate" },
+    "Reactivating Away team"
+  )){
+    renderAdminReview();
   }
-
-  renderAdminReview();
 }
   async function extendAwayStatus(index){
   if(!isAdmin()){
@@ -1444,18 +1492,13 @@ reviews.forEach((item,index)=>{
     return;
   }
 
-  team.awayStartedAt = Date.now();
-  team.awayReviewAt =
-    team.awayStartedAt +
-    MAX_AWAY_DAYS * 24 * 60 * 60 * 1000;
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "review_away_team_secure",
+    { requested_team_id: team.id, requested_action: "Extend" },
+    "Extending Away status"
+  )){
+    renderAdminReview();
   }
-
-  renderAdminReview();
 }
   async function removeAwayTeam(index){
   if(!isAdmin()){
@@ -1477,34 +1520,7 @@ reviews.forEach((item,index)=>{
     return;
   }
 
-  const previousRanks = captureTeamRanks();
-
-  teams.splice(index, 1);
-
-  createdTeams = createdTeams.filter(function(createdTeam){
-    return createdTeam !== team && createdTeam.name !== team.name;
-  });
-
-  if(myTeam === team){
-    myTeam = null;
-  }
-
-  if(historyTeam === team){
-    historyTeam = null;
-  }
-
-  recordLadderMovements(
-    previousRanks,
-    "Away team removed by Admin"
-  );
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
-  }
-
-  renderAdminReview();
+  alert("Secure Away-team removal needs one final database function before it can be enabled.");
 }
  async function extendOverdueMatch(index){
   if(!isAdmin()){
@@ -1524,27 +1540,13 @@ reviews.forEach((item,index)=>{
     return;
   }
 
-  item.acceptedAt = Date.now();
-  item.status = "Accepted";
-
-  const historyItem = challengeHistory.findLast(history =>
-    history.challenger === item.challenger.name &&
-    history.challenged === item.challenged.name &&
-    history.status === "Overdue"
-  );
-
-  if(historyItem){
-    historyItem.status = "Accepted";
-    historyItem.extendedAt = item.acceptedAt;
+  if(await callSecureFunction(
+    "review_overdue_match_secure",
+    { requested_challenge_id: item.id, requested_action: "Extend" },
+    "Extending overdue match"
+  )){
+    renderAdminReview();
   }
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
-  }
-
-  renderAdminReview();
 }
  async function recordOverdueForfeit(index){
   if(!isAdmin()){
@@ -1574,48 +1576,17 @@ reviews.forEach((item,index)=>{
     return;
   }
 
-  challenge = item;
+  const forfeitingTeamId = forfeitingTeam === "1"
+    ? item.challenger.id
+    : item.challenged.id;
 
-  challenge.winner =
-    forfeitingTeam === "1"
-      ? item.challenged
-      : item.challenger;
-
-  updateRecordsAndLadder();
-
-  challenge.status = "Completed";
-  challenge.completedAt = Date.now();
-  challenge.forfeit = true;
-
-  matchHistory.push({
-    teamA: challenge.challenger.name,
-    teamB: challenge.challenged.name,
-    completedAt: challenge.completedAt,
-    forfeit: true
-  });
-
-  const historyItem = challengeHistory.findLast(history =>
-    history.challenger === challenge.challenger.name &&
-    history.challenged === challenge.challenged.name &&
-    history.status === "Overdue"
-  );
-
-  if(historyItem){
-    historyItem.status = "Completed - Forfeit";
-    historyItem.completedAt = challenge.completedAt;
-    historyItem.forfeitedBy =
-      forfeitingTeam === "1"
-        ? item.challenger.name
-        : item.challenged.name;
+  if(await callSecureFunction(
+    "record_forfeit_secure",
+    { requested_challenge_id: item.id, forfeiting_team_id: forfeitingTeamId },
+    "Recording forfeit"
+  )){
+    renderAdminReview();
   }
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
-  }
-
-  renderAdminReview();
 }
 async function cancelOverdueMatch(index){
   if(!isAdmin()){
@@ -1639,28 +1610,13 @@ async function cancelOverdueMatch(index){
     return;
   }
 
-  item.status = "Cancelled";
-  item.cancelledAt = Date.now();
-
-  const historyItem = challengeHistory.findLast(history =>
-    history.challenger === item.challenger.name &&
-    history.challenged === item.challenged.name &&
-    history.status === "Overdue"
-  );
-
-  if(historyItem){
-    historyItem.status = "Cancelled";
-    historyItem.cancelledAt = item.cancelledAt;
-    historyItem.cancelReason = "Overdue match cancelled by admin.";
+  if(await callSecureFunction(
+    "review_overdue_match_secure",
+    { requested_challenge_id: item.id, requested_action: "Cancel" },
+    "Cancelling overdue match"
+  )){
+    renderAdminReview();
   }
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
-  }
-
-  renderAdminReview();
 }
   function selectLadder(value){
   if(!["mens","womens","mixed"].includes(value)){
@@ -1783,85 +1739,19 @@ if(!eligibleIndexes.includes(opponentIndex)){
   return;
 }
 
-  challenge={
-    challenger:myTeam,
-    challenged:teams[opponentIndex],
-    status:"Pending",
-    submittedBy:null,
-    scores:null,
-    winner:null,
-createdAt:Date.now()
-  };
-  pendingChallenges.push(challenge);
-
-challengeHistory.push({
-  challenger: myTeam.name,
-  challenged: teams[opponentIndex].name,
-  status: "Pending",
-  createdAt: Date.now()
-});
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "issue_challenge_secure",
+    { challenger_id: myTeam.id, challenged_id: opponent.id },
+    "Issuing challenge"
+  )){
+    challenge = pendingChallenges.find(function(item){
+      return item.challenger.id === myTeam.id && item.challenged.id === opponent.id && item.status === "Pending";
+    }) || null;
+    renderChallenges();
   }
-
-  renderChallenges();
 }
 function expireOldChallenges(){
-
-  const now = Date.now();
-  let stateChanged = false;
-
-  pendingChallenges.forEach(item => {
-
-    // Pending challenge: 72 hours to respond
-    if(
-      item.status === "Pending" &&
-      item.createdAt &&
-      now - item.createdAt >= 72 * 60 * 60 * 1000
-    ){
-      item.status = "Decline Pending Admin Review";
-      stateChanged = true;
-      item.declineReason = "No response within 72 hours.";
-      item.declinedAt = now;
-
-      const historyItem = challengeHistory.findLast(history =>
-        history.challenger === item.challenger.name &&
-        history.challenged === item.challenged.name &&
-        history.status === "Pending"
-      );
-
-      if(historyItem){
-        historyItem.status = "Decline Pending Admin Review";
-        historyItem.declineReason = item.declineReason;
-        historyItem.declinedAt = now;
-      }
-    }
-
-    // Accepted challenge: 7 days to play
-    if(
-      item.status === "Accepted" &&
-      item.acceptedAt &&
-      now - item.acceptedAt >= 7 * 24 * 60 * 60 * 1000
-    ){
-      item.status = "Overdue";
-      stateChanged = true;
-
-      const historyItem = challengeHistory.findLast(history =>
-        history.challenger === item.challenger.name &&
-        history.challenged === item.challenged.name &&
-        history.status === "Accepted"
-      );
-
-      if(historyItem){
-        historyItem.status = "Overdue";
-        historyItem.overdueAt = now;
-      }
-    }
-  });
-
-  return stateChanged;
+  return false;
 }
 
   
@@ -2043,9 +1933,9 @@ if(challenge.status==="Decline Pending Admin Review"){
     c.innerHTML=
       "<h2>My Challenges</h2>"+
       "<div class='warning'><b>Result Disputed</b><br><br>"+
-      "The opposing team did not confirm the submitted result. No standings were changed."+
-      "</div>"+
-      "<button onclick='resetResult()'>Re-enter Result</button>";
+      "The opposing team did not confirm the submitted result. No standings were changed.<br><br>"+
+      "Please contact the ladder administrator to reopen score entry."+
+      "</div>";
   }
 }
 
@@ -2081,22 +1971,13 @@ if(activeMatch){
   return;
 }
  
-  challenge.status="Accepted";
-  challenge.acceptedAt = Date.now();
- 
-  const historyItem=challengeHistory.findLast(item =>
-  item.challenger===challenge.challenger.name &&
-  item.challenged===challenge.challenged.name &&
-  item.status==="Pending"
-);
-if(historyItem) historyItem.status="Accepted";
-   const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "respond_to_challenge_secure",
+    { challenge_id: challenge.id, response: "Accept", decline_reason: null },
+    "Accepting challenge"
+  )){
+    renderChallenges();
   }
-
-  renderChallenges();
 }
 async function declineChallenge(){
   if(!currentUser){
@@ -2148,25 +2029,13 @@ if(priorityChallenge && challenge !== priorityChallenge){
         return;
     }
 
-    challenge.status = "Decline Pending Admin Review";
-    challenge.declineReason = declineReason;
-  const historyItem=challengeHistory.findLast(item =>
-  item.challenger===challenge.challenger.name &&
-  item.challenged===challenge.challenged.name &&
-  item.status==="Pending"
-);
-
-if(historyItem){
-historyItem.status="Decline Pending Admin Review";
-  historyItem.declineReason=declineReason;
-}
-     const saved = await saveLadderState();
-
-    if(!saved){
-      await loadLadderState();
+    if(await callSecureFunction(
+      "respond_to_challenge_secure",
+      { challenge_id: challenge.id, response: "Decline", decline_reason: declineReason },
+      "Declining challenge"
+    )){
+      renderChallenges();
     }
-
-    renderChallenges();
 }
 async function approveDecline(index){
   if(!isAdmin()){
@@ -2186,27 +2055,13 @@ async function approveDecline(index){
     return;
   }
 
-  item.status = "Declined";
-  item.declineReviewedAt = Date.now();
-
-  const historyItem = challengeHistory.findLast(history =>
-    history.challenger === item.challenger.name &&
-    history.challenged === item.challenged.name &&
-    history.status === "Decline Pending Admin Review"
-  );
-
-  if(historyItem){
-    historyItem.status = "Declined";
-    historyItem.declineReviewedAt = item.declineReviewedAt;
+  if(await callSecureFunction(
+    "review_decline_secure",
+    { requested_challenge_id: item.id, requested_decision: "Approve" },
+    "Approving decline"
+  )){
+    renderAdminReview();
   }
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
-  }
-
-  renderAdminReview();
 }
 
 async function rejectDecline(index){
@@ -2227,48 +2082,13 @@ async function rejectDecline(index){
     return;
   }
 
-  const previousRanks = captureTeamRanks();
- const decliningTeam = item.challenged;
-const teamLadder = decliningTeam.ladder || "mens";
-const ladderTeams = getLadderTeams(teamLadder);
-const decliningLadderIndex = ladderTeams.indexOf(decliningTeam);
-
-if(
-  decliningLadderIndex >= 0 &&
-  decliningLadderIndex < ladderTeams.length - 1
-){
-  const teamBelow = ladderTeams[decliningLadderIndex + 1];
-
-  const decliningMainIndex = teamIndex(decliningTeam);
-  const belowMainIndex = teamIndex(teamBelow);
-
-  teams[decliningMainIndex] = teamBelow;
-  teams[belowMainIndex] = decliningTeam;
-}
-
-  recordLadderMovements(previousRanks, "Decline penalty");
-
-  item.status = "Declined - Penalty Applied";
-  item.declineReviewedAt = Date.now();
-
-  const historyItem = challengeHistory.findLast(history =>
-    history.challenger === item.challenger.name &&
-    history.challenged === item.challenged.name &&
-    history.status === "Decline Pending Admin Review"
-  );
-
-  if(historyItem){
-    historyItem.status = "Declined - Penalty Applied";
-    historyItem.declineReviewedAt = item.declineReviewedAt;
+  if(await callSecureFunction(
+    "review_decline_secure",
+    { requested_challenge_id: item.id, requested_decision: "Reject" },
+    "Rejecting decline"
+  )){
+    renderAdminReview();
   }
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
-  }
-
-  renderAdminReview();
 }
 async function cancelChallenge(){
   if(!currentUser){
@@ -2288,26 +2108,13 @@ async function cancelChallenge(){
     return;
   }
 
-  challenge.status = "Cancelled";
-
-  const historyItem = challengeHistory.findLast(item =>
-    item.challenger === challenge.challenger.name &&
-    item.challenged === challenge.challenged.name &&
-    item.status === "Pending"
-  );
-
-  if(historyItem){
-    historyItem.status = "Cancelled";
-    historyItem.cancelledAt = Date.now();
+  if(await callSecureFunction(
+    "cancel_challenge_secure",
+    { requested_challenge_id: challenge.id },
+    "Cancelling challenge"
+  )){
+    renderChallenges();
   }
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
-  }
-
-  renderChallenges();
 }
 function clearChallenge(){
   challenge=null;
@@ -2468,23 +2275,17 @@ let challengedGames=0;
     else challengedGames++;
   }
 
-  challenge.scores=scores;
-
-  challenge.winner=
-    challengerGames>challengedGames
-      ? challenge.challenger
-      : challenge.challenged;
-
-  challenge.submittedBy=myTeam;
-  challenge.status="Awaiting Confirmation";
-
-   const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "submit_result_secure",
+    {
+      requested_challenge_id: challenge.id,
+      submitting_team_id: myTeam.id,
+      submitted_scores: scores
+    },
+    "Submitting result"
+  )){
+    renderChallenges();
   }
-
-  renderChallenges();
 }
 
 function scoreSummary(){
@@ -2520,33 +2321,13 @@ if(!canManageTeam(myTeam)){
     alert("Only the opposing team can confirm this result.");
     return;
   }
-  updateRecordsAndLadder();
-  challenge.status="Completed";
-  
-  challenge.completedAt = Date.now();
-  
-  const historyItem = challengeHistory.findLast(item =>
-  item.challenger === challenge.challenger.name &&
-  item.challenged === challenge.challenged.name &&
-  item.status === "Accepted"
-);
-
-if(historyItem){
-  historyItem.status = "Completed";
-  historyItem.completedAt = challenge.completedAt;
-}
-  matchHistory.push({
-    teamA: challenge.challenger.name,
-    teamB: challenge.challenged.name,
-    completedAt: challenge.completedAt
-});
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "confirm_result_secure",
+    { requested_challenge_id: challenge.id, requested_action: "Confirm" },
+    "Confirming result"
+  )){
+    renderChallenges();
   }
-
-  renderChallenges();
 }
 
 async function disputeResult(){
@@ -2568,26 +2349,13 @@ if(!canManageTeam(myTeam)){
     return;
   }
 
-  challenge.status = "Disputed";
-
-  const historyItem = challengeHistory.findLast(item =>
-    item.challenger === challenge.challenger.name &&
-    item.challenged === challenge.challenged.name &&
-    item.status === "Accepted"
-  );
-
-  if(historyItem){
-    historyItem.status = "Disputed";
-    historyItem.disputedAt = Date.now();
+  if(await callSecureFunction(
+    "confirm_result_secure",
+    { requested_challenge_id: challenge.id, requested_action: "Dispute" },
+    "Disputing result"
+  )){
+    renderChallenges();
   }
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
-  }
-
-  renderChallenges();
 }
 
 async function resetResult(){
@@ -2883,30 +2651,13 @@ async function removePartnerListing(index){
     return;
   }
 
-  partnerListings.splice(index, 1);
-
-  partnerInvites.forEach(function(invite){
-    const belongsToListing =
-      invite.status === "Pending" &&
-      (
-        (player.userId && invite.toUserId === player.userId) ||
-        (!player.userId && invite.to === player.name)
-      );
-
-    if(belongsToListing){
-      invite.status = "Cancelled";
-      invite.cancelledAt = Date.now();
-      invite.cancelReason = "Partner listing removed.";
-    }
-  });
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "remove_partner_listing_secure",
+    { requested_listing_id: player.id },
+    "Removing partner listing"
+  )){
+    renderPartners();
   }
-
-  renderPartners();
 }
 function renderPartnerForm(){
 
@@ -2977,22 +2728,18 @@ if(ladder === "womens" && gender !== "Female"){
     return;
   }
 
-   partnerListings.push({
-    name: name,
-    gender: gender,
-    dupr: dupr,
-    ladder: ladder,
-    userId: currentUser.id,
-    email: currentUser.email
-  });
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "create_partner_listing_secure",
+    {
+      requested_name: name,
+      requested_gender: gender,
+      requested_dupr: dupr,
+      requested_ladder: ladder
+    },
+    "Creating partner listing"
+  )){
+    renderPartners();
   }
-
-  renderPartners();
 }
 async function sendPartnerInvite(index){
   if(!currentUser){
@@ -3091,30 +2838,19 @@ async function sendPartnerInvite(index){
   }
 
   
-  partnerInvites.push({
-    from: senderName.trim(),
-fromDupr: normalizedSenderDupr,
-fromGender: senderGenderDisplay,
-    fromUserId: currentUser.id,
-    fromEmail: currentUser.email,
-    to: player.name,
-    toGender: player.gender,
-    toDupr: player.dupr,
-    toUserId: player.userId || null,
-    toEmail: player.email || null,
-    ladder: listingLadder,
-    status: "Pending",
-    createdAt: Date.now()
-  });
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "send_partner_invite_secure",
+    {
+      requested_listing_id: player.id,
+      requested_sender_name: senderName.trim(),
+      requested_sender_gender: senderGenderDisplay,
+      requested_sender_dupr: normalizedSenderDupr
+    },
+    "Sending partner invitation"
+  )){
+    alert("Partner invite sent to " + player.name + ".");
+    renderPartners();
   }
-
-  alert("Partner invite sent to " + player.name + ".");
-  renderPartners();
 }
 async function acceptPartnerInvite(index){
   if(!currentUser){
@@ -3241,59 +2977,19 @@ async function acceptPartnerInvite(index){
     return;
   }
   
-  invite.status = "Accepted";
-  invite.acceptedAt = Date.now();
-
-  createdTeams.push({
-    name: teamName.trim(),
-    players: invite.from + " / " + invite.to,
-    player1Gender: invite.fromGender,
-    player2Gender: invite.toGender,
-    ladder: inviteLadder,
-    dupr: combinedDupr,
-    isNR: teamIsNR,
-    wins: 0,
-    losses: 0,
-    memberUserIds: [
-      invite.fromUserId,
-      invite.toUserId
-    ].filter(Boolean),
-    memberEmails: [
-      invite.fromEmail,
-      invite.toEmail
-    ].filter(Boolean)
-  });
-
- placeNewTeamByDupr();
-
-const newTeam = createdTeams[createdTeams.length - 1];
-
-currentLadder = newTeam.ladder || "mens";
-myTeam = newTeam;
-  const invitedUserIds = [
-    invite.fromUserId,
-    invite.toUserId
-  ].filter(Boolean);
-
-  partnerListings = partnerListings.filter(function(player){
-    return (
-      !invitedUserIds.includes(player.userId) &&
-      player.name !== invite.to &&
-      player.name !== invite.from
-    );
-  });
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "accept_partner_invite_secure",
+    {
+      requested_invite_id: invite.id,
+      requested_team_name: teamName.trim()
+    },
+    "Accepting partner invitation"
+  )){
+    currentLadder = inviteLadder;
+    myTeam = findCurrentUsersTeam();
+    alert(invite.to + " accepted the partner invite from " + invite.from + ".");
+    show("board");
   }
-
-  alert(
-    invite.to + " accepted the partner invite from " + invite.from + "."
-  );
-
-  show("board");
 }
 async function declinePartnerInvite(index){
   if(!currentUser){
@@ -3313,20 +3009,14 @@ async function declinePartnerInvite(index){
     return;
   }
 
-  invite.status = "Declined";
-  invite.declinedAt = Date.now();
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "decline_partner_invite_secure",
+    { requested_invite_id: invite.id },
+    "Declining partner invitation"
+  )){
+    alert(invite.to + " declined the partner invite from " + invite.from + ".");
+    renderPartners();
   }
-
-  alert(
-    invite.to + " declined the partner invite from " + invite.from + "."
-  );
-
-  renderPartners();
 }
 async function cancelPartnerInvite(index){
   if(!currentUser){
@@ -3350,40 +3040,39 @@ async function cancelPartnerInvite(index){
     return;
   }
 
-  invite.status = "Cancelled";
-  invite.cancelledAt = Date.now();
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(await callSecureFunction(
+    "cancel_partner_invite_secure",
+    { requested_invite_id: invite.id },
+    "Cancelling partner invitation"
+  )){
+    alert(invite.from + " cancelled the partner invitation to " + invite.to + ".");
+    renderPartners();
   }
-
-  alert(
-    invite.from + " cancelled the partner invitation to " + invite.to + "."
-  );
-
-  renderPartners();
 }
   
 async function startApp(){
   await loadCurrentUser();
-await loadLadderState();
+
+  if(currentUser){
+    const refreshResults = await Promise.all([
+      dbClient.rpc("refresh_challenge_deadlines_secure"),
+      dbClient.rpc("refresh_acceptance_enforcement_secure")
+    ]);
+
+    refreshResults.forEach(function(result){
+      if(result.error){
+        console.error("Automatic deadline refresh failed:",result.error);
+      }
+    });
+  }
+
+  await loadLadderState();
 
 if(!currentUser){
   myTeam = null;
 }else if(!isAdmin()){
   myTeam = findCurrentUsersTeam();
 }
-
-const deadlineChanges = expireOldChallenges();
-  if(deadlineChanges && currentUser){
-    const saved = await saveLadderState();
-
-    if(!saved){
-      await loadLadderState();
-    }
-  }
 
   show("board");
 }
