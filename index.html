@@ -759,18 +759,19 @@ teams.forEach((team,i)=>{
         "<b>You are viewing the public ladder.</b><br><br>" +
         "<button class='smallBtn' onclick='signInWithEmail()'>Sign In by Email</button>" +
       "</div>";
+  const assignmentHtml =
+  currentUser &&
+  !isAdmin() &&
+  !findCurrentUsersTeam()
+    ? "<div class='warning'><b>Your account has not been assigned to a team yet.</b><br>Please contact the ladder administrator.</div>"
+    : "";
     let html=
    "<h2>Leaderboard</h2>"+
 authHtml+
 assignmentHtml+
 "<p><b>Which team are you?</b></p>"+
     "<select onchange='selectTeam(this.value)'>"+options+"</select>";
-const assignmentHtml =
-  currentUser &&
-  !isAdmin() &&
-  !findCurrentUsersTeam()
-    ? "<div class='warning'><b>Your account has not been assigned to a team yet.</b><br>Please contact the ladder administrator.</div>"
-    : "";
+
   const myIndex=myTeam ? teamIndex(myTeam) : -1;
 
 if(myIndex >= 0){
