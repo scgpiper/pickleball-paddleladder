@@ -484,11 +484,14 @@ function findCurrentUsersTeam(){
     return email !== "";
   });
 
-  if(!emails.length){
-    alert("Please enter at least one player email.");
+if(!emails.length){
+  if(!confirm("Remove all assigned player emails from " + team.name + "?")){
     return;
   }
 
+  team.memberEmails = [];
+
+}else{
   const invalidEmail = emails.find(function(email){
     return !email.includes("@");
   });
@@ -499,6 +502,7 @@ function findCurrentUsersTeam(){
   }
 
   team.memberEmails = [...new Set(emails)];
+}
 
   const saved = await saveLadderState();
 
