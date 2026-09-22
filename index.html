@@ -2578,34 +2578,43 @@ const previousRanks = captureTeamRanks();
   cancelInvalidPendingChallenges();
 }
 function cancelInvalidPendingChallenges(){
-
   const now = Date.now();
 
-  pendingChallenges.forEach(item => {
-
-    if(item.status !== "Pending") return;
+  pendingChallenges.forEach(function(item){
+    if(item.status !== "Pending"){
+      return;
+    }
 
     const challengerIndex = teamIndex(item.challenger);
     const challengedIndex = teamIndex(item.challenged);
 
-    if(challengerIndex === -1 || challengedIndex === -1) return;
+    if(challengerIndex === -1 || challengedIndex === -1){
+      return;
+    }
 
-    const distance = challengerIndex - challengedIndex;
+    const challengerLadder =
+      item.challenger.ladder || "mens";
 
-    // Top 10, or challenging into the Top 10 = maximum 2 positions.
-    // Below the Top 10 = maximum 3 positions.
-    const maxChallengeDistance =
-      (challengerIndex < 10 || challengedIndex < 10) ? 2 : 3;
+    const challengedLadder =
+      item.challenged.ladder || "mens";
 
-    if(distance < 1 || distance > maxChallengeDistance){
+    const eligibleIndexes =
+      eligibleChallengeIndexes(item.challenger);
 
+    const challengeIsValid =
+      challengerLadder === challengedLadder &&
+      eligibleIndexes.includes(challengedIndex);
+
+    if(!challengeIsValid){
       item.status = "Cancelled";
 
-      const historyItem = challengeHistory.findLast(history =>
-        history.challenger === item.challenger.name &&
-        history.challenged === item.challenged.name &&
-        history.status === "Pending"
-      );
+      const historyItem = challengeHistory.findLast(function(history){
+        return (
+          history.challenger === item.challenger.name &&
+          history.challenged === item.challenged.name &&
+          history.status === "Pending"
+        );
+      });
 
       if(historyItem){
         historyItem.status = "Cancelled";
