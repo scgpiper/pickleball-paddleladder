@@ -888,13 +888,15 @@ const reviews=pendingChallenges.filter(item =>
   item.status==="Decline Pending Admin Review" ||
   item.status==="Overdue"
 );
-
+const awayReviews = teams.filter(function(team){
+  return isAwayReviewDue(team);
+});
   c.innerHTML="<h2>🛡️ Admin Review</h2>";
 
-  if(!reviews.length){
-    c.innerHTML+="<p>No declines waiting for admin review.</p>";
-    return;
-  }
+if(!reviews.length && !awayReviews.length){
+  c.innerHTML += "<p>No items waiting for admin review.</p>";
+  return;
+}
 
 reviews.forEach((item,index)=>{
 
@@ -918,7 +920,134 @@ reviews.forEach((item,index)=>{
       "<button class='declineBtn smallBtn' onclick='rejectDecline("+index+")'>Reject Decline</button>"+
       "</div>";
   }
+});awayReviews.forEach(function(team){
+  const index = teamIndex(team);
+
+  const awaySince = team.awayStartedAt
+    ? new Date(team.awayStartedAt).toLocaleDateString()
+    : "Unknown";
+
+  c.innerHTML +=
+    "<div class='warning'>" +
+      "<b>🏖️ " + team.name + "</b><br><br>" +
+      "<b>Away since:</b> " + awaySince + "<br><br>" +
+      "<b>Status:</b> Away longer than 30 days — Admin Review required.<br><br>" +
+      "<button class='acceptBtn smallBtn' onclick='adminReactivateAway(" +
+        index + ")'>Reactivate Team</button> " +
+      "<button class='smallBtn' onclick='extendAwayStatus(" +
+        index + ")'>Extend Away 30 Days</button> " +
+      "<button class='declineBtn smallBtn' onclick='removeAwayTeam(" +
+        index + ")'>Remove Team</button>" +
+    "</div>";
 });
+}
+  async function adminReactivateAway(index){
+  if(!isAdmin()){
+    alert("Only Admin can reactivate an expired Away team.");
+    return;
+  }
+
+  const team = teams[index];
+
+  if(!team || !isTeamAway(team)){
+    alert("This Away team could not be found.");
+    return;
+  }
+
+  if(!confirm("Reactivate " + team.name + "?")){
+    return;
+  }
+
+  team.away = false;
+  team.awayStartedAt = null;
+  team.awayReviewAt = null;
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
+  renderAdminReview();
+}
+  async function extendAwayStatus(index){
+  if(!isAdmin()){
+    alert("Only Admin can extend an Away status.");
+    return;
+  }
+
+  const team = teams[index];
+
+  if(!team || !isTeamAway(team)){
+    alert("This Away team could not be found.");
+    return;
+  }
+
+  if(!confirm("Extend " + team.name + "'s Away status for another 30 days?")){
+    return;
+  }
+
+  team.awayStartedAt = Date.now();
+  team.awayReviewAt =
+    team.awayStartedAt +
+    MAX_AWAY_DAYS * 24 * 60 * 60 * 1000;
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
+  renderAdminReview();
+}
+  async function removeAwayTeam(index){
+  if(!isAdmin()){
+    alert("Only Admin can remove an expired Away team.");
+    return;
+  }
+
+  const team = teams[index];
+
+  if(!team || !isAwayReviewDue(team)){
+    alert("This team is not eligible for removal.");
+    return;
+  }
+
+  if(!confirm(
+    "Remove " + team.name +
+    " from the ladder? Teams below it will move up one position."
+  )){
+    return;
+  }
+
+  const previousRanks = captureTeamRanks();
+
+  teams.splice(index, 1);
+
+  createdTeams = createdTeams.filter(function(createdTeam){
+    return createdTeam !== team && createdTeam.name !== team.name;
+  });
+
+  if(myTeam === team){
+    myTeam = null;
+  }
+
+  if(historyTeam === team){
+    historyTeam = null;
+  }
+
+  recordLadderMovements(
+    previousRanks,
+    "Away team removed by Admin"
+  );
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
+  renderAdminReview();
 }
  async function extendOverdueMatch(index){
   if(!isAdmin()){
