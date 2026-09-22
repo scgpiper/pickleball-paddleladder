@@ -377,6 +377,163 @@ let challenge = null;
 function teamIndex(team){
   return teams.indexOf(team);
 }
+  const MAX_AWAY_DAYS = 30;
+
+function isTeamAway(team){
+  return Boolean(team && team.away === true);
+}
+
+function isAwayReviewDue(team){
+  if(!isTeamAway(team) || !team.awayStartedAt){
+    return false;
+  }
+
+  const thirtyDays = MAX_AWAY_DAYS * 24 * 60 * 60 * 1000;
+
+  return Date.now() - Number(team.awayStartedAt) >= thirtyDays;
+}
+  function canManageTeam(team){
+  if(!currentUser || !team){
+    return false;
+  }
+
+  if(isAdmin()){
+    return true;
+  }
+
+  const userIdMatch =
+    Array.isArray(team.memberUserIds) &&
+    team.memberUserIds.includes(currentUser.id);
+
+  const emailMatch =
+    Array.isArray(team.memberEmails) &&
+    team.memberEmails.some(function(email){
+      return String(email).toLowerCase() ===
+        String(currentUser.email).toLowerCase();
+    });
+
+  return userIdMatch || emailMatch;
+}
+  function eligibleChallengeIndexes(team){
+  const myIndex = teamIndex(team);
+
+  if(myIndex < 0 || isTeamAway(team)){
+    return [];
+  }
+
+  const eligibleIndexes = [];
+  let availableTeamsFound = 0;
+
+  for(let i = myIndex - 1; i >= 0; i--){
+    if(isTeamAway(teams[i])){
+      continue;
+    }
+
+    availableTeamsFound++;
+
+    const limit =
+      (myIndex < 10 || i < 10) ? 2 : 3;
+
+    if(availableTeamsFound <= limit){
+      eligibleIndexes.push(i);
+    }
+
+    if(availableTeamsFound >= 3){
+      break;
+    }
+  }
+
+  return eligibleIndexes;
+}
+  async function setTeamAway(index){
+  if(!currentUser){
+    alert("Please sign in before setting an Away status.");
+    return;
+  }
+
+  const team = teams[index];
+
+  if(!team){
+    alert("This team could not be found.");
+    return;
+  }
+
+  if(!canManageTeam(team)){
+    alert("Only a team member or Admin can change this team's Away status.");
+    return;
+  }
+
+  const openChallenge = pendingChallenges.find(function(item){
+    return (
+      [
+        "Pending",
+        "Accepted",
+        "Awaiting Confirmation",
+        "Decline Pending Admin Review",
+        "Overdue",
+        "Disputed"
+      ].includes(item.status) &&
+      (item.challenger === team || item.challenged === team)
+    );
+  });
+
+  if(openChallenge){
+    alert("This team must finish or close its current challenge before going Away.");
+    return;
+  }
+
+  if(!confirm("Mark " + team.name + " as Away for up to 30 days?")){
+    return;
+  }
+
+  team.away = true;
+  team.awayStartedAt = Date.now();
+  team.awayReviewAt =
+    team.awayStartedAt +
+    MAX_AWAY_DAYS * 24 * 60 * 60 * 1000;
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
+  renderBoard();
+}
+  async function returnTeamFromAway(index){
+  if(!currentUser){
+    alert("Please sign in before changing an Away status.");
+    return;
+  }
+
+  const team = teams[index];
+
+  if(!team){
+    alert("This team could not be found.");
+    return;
+  }
+
+  if(!canManageTeam(team)){
+    alert("Only a team member or Admin can reactivate this team.");
+    return;
+  }
+
+  if(!confirm("Return " + team.name + " to active status?")){
+    return;
+  }
+
+  team.away = false;
+  team.awayStartedAt = null;
+  team.awayReviewAt = null;
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+  }
+
+  renderBoard();
+}
   function restoreChallengeTeamReferences(items){
   if(!Array.isArray(items)) return [];
 
@@ -502,35 +659,43 @@ const c=document.getElementById("content");
 
   const myIndex=myTeam ? teamIndex(myTeam) : -1;
 
- if(myIndex>=0){
-  const maxChallengeDistance = myIndex <= 10 ? 2 : 3;
-  const first=Math.max(0,myIndex-maxChallengeDistance);
-  const last=myIndex-1;
+if(myIndex >= 0){
+  const noticeIndexes = eligibleChallengeIndexes(myTeam);
 
-    if(last>=first){
-      html+=
-        "<div class='notice'><b>You are #"+(myIndex+1)+" "+myTeam.name+
-        ".</b> You may challenge ranks #"+(first+1)+" through #"+(last+1)+".</div>";
-    }else{
-      html+="<div class='notice'><b>You are ranked #1.</b> There is nobody above you to challenge.</div>";
-    }
+  if(isTeamAway(myTeam)){
+    html +=
+      "<div class='notice'><b>You are #" + (myIndex + 1) + " " +
+      myTeam.name + ".</b> Your team is currently Away and cannot issue or receive challenges.</div>";
+
+  }else if(noticeIndexes.length){
+    const availableRanks = noticeIndexes.map(function(index){
+      return "#" + (index + 1);
+    }).join(", ");
+
+    html +=
+      "<div class='notice'><b>You are #" + (myIndex + 1) + " " +
+      myTeam.name + ".</b> You may challenge the available teams at " +
+      availableRanks + ".</div>";
+
+  }else{
+    html +=
+      "<div class='notice'><b>You are ranked #1.</b> There is nobody above you to challenge.</div>";
   }
+}
 
   html+=
     "<table>"+
     "<tr><th>Rank</th><th>Team</th><th>Combined DUPR</th><th>W-L</th><th></th></tr>";
 
-  teams.forEach((team,i)=>{
+ const challengeableIndexes =
+  myTeam ? eligibleChallengeIndexes(myTeam) : [];
 
-  const maxChallengeDistance =
-  (myIndex < 10 || i < 10) ? 2 : 3;
+teams.forEach((team,i)=>{
 
-const eligible =
-  myIndex >= 0 &&
-  i < myIndex &&
-  i >= myIndex - maxChallengeDistance;
-
+const eligible = challengeableIndexes.includes(i);
     const mine=team===myTeam;
+    const teamAway = isTeamAway(team);
+const canChangeAway = canManageTeam(team);
     const teamActiveMatch = pendingChallenges.find(item =>
   ["Accepted","Awaiting Confirmation"].includes(item.status) &&
   (item.challenger === team || item.challenged === team)
@@ -558,12 +723,23 @@ const rematchLocked = matchHistory.some(match => {
     html+=
       "<tr class='"+(i<10?"top10 ":"")+(mine?"myteam":"")+"'>"+
       "<td><b>#"+(i+1)+"</b></td>"+
-      "<td><b>"+team.name+"</b><div class='muted'>"+team.players+"</div></td>"+
+      "<td><b>"+team.name+"</b>"+
+(teamAway ? "<div class='muted'>🏖️ Away</div>" : "")+
+"<div class='muted'>"+team.players+"</div></td>"+
       "<td>"+(team.isNR ? "NR" : Number(team.dupr).toFixed(2))+"</td>"+
       "<td>"+team.wins+"-"+team.losses+"</td>"+
       "<td>";
 
-if(teamActiveMatch){
+if(teamAway){
+
+  if(mine && canChangeAway){
+    html +=
+      "<button class='smallBtn' onclick='returnTeamFromAway("+i+")'>Return Active</button>";
+  }else{
+    html += "<span class='muted'>🏖️ Unavailable</span>";
+  }
+
+}else if(teamActiveMatch){
 
   const opponent =
     teamActiveMatch.challenger === team
@@ -597,6 +773,11 @@ if(teamActiveMatch){
 }else if(mine){
 
   html += "<span class='muted'>Your team</span>";
+
+  if(canChangeAway && !challengeBusy){
+    html +=
+      "<br><button class='smallBtn' onclick='setTeamAway("+i+")'>Mark Away</button>";
+  }
 }
 
     html+="</td></tr>";
@@ -950,15 +1131,19 @@ if(unansweredIncoming){
   alert("You must respond to all incoming challenges before issuing a new challenge.");
   return;
 }
-const myIndex=teamIndex(myTeam);
-const distance=myIndex-opponentIndex;
+if(isTeamAway(myTeam)){
+  alert("Your team cannot issue a challenge while marked Away.");
+  return;
+}
 
-// Top 10, or challenging into the Top 10 = maximum 2 positions.
-// Otherwise = maximum 3 positions.
-const maxChallengeDistance =
-  (myIndex < 10 || opponentIndex < 10) ? 2 : 3;
+if(isTeamAway(opponent)){
+  alert("That team is currently Away and cannot be challenged.");
+  return;
+}
 
-if(distance < 1 || distance > maxChallengeDistance){
+const eligibleIndexes = eligibleChallengeIndexes(myTeam);
+
+if(!eligibleIndexes.includes(opponentIndex)){
   alert("That team is outside your challenge limit.");
   return;
 }
