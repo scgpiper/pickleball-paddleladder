@@ -824,6 +824,112 @@ function show(page){
   }
 }
 
+async function adminAddTeam(){
+  if(!isAdmin()){
+    alert("Only Admin can add a team directly.");
+    return;
+  }
+
+  const ladderNames = {
+    mens: "Men's Ladder",
+    womens: "Women's Ladder",
+    mixed: "Mixed Ladder"
+  };
+
+  const teamName = prompt(
+    "Enter the team name for the " + ladderNames[currentLadder] + ":"
+  );
+
+  if(teamName === null || teamName.trim() === ""){
+    return;
+  }
+
+  const duplicateName = teams.some(function(team){
+    return team.name.toLowerCase() === teamName.trim().toLowerCase();
+  });
+
+  if(duplicateName){
+    alert("That team name is already being used.");
+    return;
+  }
+
+  const playerOne = prompt("Enter the first player's name:");
+  if(playerOne === null || playerOne.trim() === ""){
+    return;
+  }
+
+  const playerTwo = prompt("Enter the second player's name:");
+  if(playerTwo === null || playerTwo.trim() === ""){
+    return;
+  }
+
+  const playerOneDupr = prompt(
+    "Enter " + playerOne.trim() + "'s DUPR, or type NR:"
+  );
+  if(playerOneDupr === null) return;
+
+  const playerTwoDupr = prompt(
+    "Enter " + playerTwo.trim() + "'s DUPR, or type NR:"
+  );
+  if(playerTwoDupr === null) return;
+
+  const firstIsNR =
+    playerOneDupr.trim().toUpperCase() === "NR";
+
+  const secondIsNR =
+    playerTwoDupr.trim().toUpperCase() === "NR";
+
+  const teamIsNR = firstIsNR || secondIsNR;
+
+  if(
+    !teamIsNR &&
+    (
+      isNaN(parseFloat(playerOneDupr)) ||
+      isNaN(parseFloat(playerTwoDupr))
+    )
+  ){
+    alert("Please enter a valid DUPR or NR for each player.");
+    return;
+  }
+
+  const combinedDupr = teamIsNR
+    ? "NR"
+    : (
+        parseFloat(playerOneDupr) +
+        parseFloat(playerTwoDupr)
+      ).toFixed(2);
+
+  const newTeam = {
+    name: teamName.trim(),
+    players: playerOne.trim() + " / " + playerTwo.trim(),
+    ladder: currentLadder,
+    dupr: combinedDupr,
+    isNR: teamIsNR,
+    wins: 0,
+    losses: 0,
+    memberUserIds: [],
+    memberEmails: []
+  };
+
+  createdTeams.push(newTeam);
+  placeNewTeamByDupr();
+  myTeam = newTeam;
+
+  const saved = await saveLadderState();
+
+  if(!saved){
+    await loadLadderState();
+    return;
+  }
+
+  alert(
+    newTeam.name + " was added to the " +
+    ladderNames[currentLadder] + "."
+  );
+
+  renderBoard();
+}
+  
 function renderBoard(){
   const c = document.getElementById("content");
   const ladderTeams = getLadderTeams(currentLadder);
@@ -882,7 +988,12 @@ function renderBoard(){
     assignmentHtml +
     "<p><b>Which team are you?</b></p>" +
     "<select onchange='selectTeam(this.value)'>" + options + "</select>";
-
+if(isAdmin()){
+  html +=
+    "<br><br><button class='smallBtn' onclick='adminAddTeam()'>" +
+      "➕ Add Team to This Ladder" +
+    "</button>";
+}
   const myIndex = myTeam ? ladderTeams.indexOf(myTeam) : -1;
 if(myIndex >= 0){
   const noticeIndexes = eligibleChallengeIndexes(myTeam);
@@ -2775,9 +2886,12 @@ async function acceptPartnerInvite(index){
     ].filter(Boolean)
   });
 
-  placeNewTeamByDupr();
-  myTeam = createdTeams[createdTeams.length - 1];
+ placeNewTeamByDupr();
 
+const newTeam = createdTeams[createdTeams.length - 1];
+
+currentLadder = newTeam.ladder || "mens";
+myTeam = newTeam;
   const invitedUserIds = [
     invite.fromUserId,
     invite.toUserId
