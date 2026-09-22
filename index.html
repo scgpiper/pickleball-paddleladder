@@ -246,7 +246,13 @@ async function loadLadderState(){
   const selectedTeamName = myTeam ? myTeam.name : null;
   const historyTeamName = historyTeam ? historyTeam.name : null;
 
-  teams = data.teams;
+ teams = data.teams.map(function(team){
+  if(!team.ladder){
+    team.ladder = "mens";
+  }
+
+  return team;
+});
   pendingChallenges =
     restoreChallengeTeamReferences(data.pending_challenges);
   challengeHistory = Array.isArray(data.challenge_history)
@@ -368,6 +374,7 @@ function placeNewTeamByDupr(){
   teams.splice(insertIndex, 0, newTeam);
 }
 let myTeam = null;
+  let currentLadder = "mens";
   let historyTeam = null;
  let partnerListings = [];
   let createdTeams = [];
@@ -376,6 +383,11 @@ let challenge = null;
 
 function teamIndex(team){
   return teams.indexOf(team);
+}
+  function getLadderTeams(ladder){
+  return teams.filter(function(team){
+    return (team.ladder || "mens") === ladder;
+  });
 }
   const MAX_AWAY_DAYS = 30;
 
@@ -439,7 +451,12 @@ function findCurrentUsersTeam(){
   }
 
   return teams.find(function(team){
-    return userBelongsToTeam(team);
+    const teamLadder = team.ladder || "mens";
+
+    return (
+      teamLadder === currentLadder &&
+      userBelongsToTeam(team)
+    );
   }) || null;
 }
   async function assignTeamMembers(index){
@@ -514,28 +531,36 @@ if(!emails.length){
 
   renderBoard();
 }
-  function eligibleChallengeIndexes(team){
-  const myIndex = teamIndex(team);
+function eligibleChallengeIndexes(team){
+  if(!team || isTeamAway(team)){
+    return [];
+  }
 
-  if(myIndex < 0 || isTeamAway(team)){
+  const teamLadder = team.ladder || "mens";
+  const ladderTeams = getLadderTeams(teamLadder);
+  const myLadderIndex = ladderTeams.indexOf(team);
+
+  if(myLadderIndex < 0){
     return [];
   }
 
   const eligibleIndexes = [];
   let availableTeamsFound = 0;
 
-  for(let i = myIndex - 1; i >= 0; i--){
-    if(isTeamAway(teams[i])){
+  for(let i = myLadderIndex - 1; i >= 0; i--){
+    const opponent = ladderTeams[i];
+
+    if(isTeamAway(opponent)){
       continue;
     }
 
     availableTeamsFound++;
 
     const limit =
-      (myIndex < 10 || i < 10) ? 2 : 3;
+      (myLadderIndex < 10 || i < 10) ? 2 : 3;
 
     if(availableTeamsFound <= limit){
-      eligibleIndexes.push(i);
+      eligibleIndexes.push(teamIndex(opponent));
     }
 
     if(availableTeamsFound >= 3){
@@ -731,49 +756,65 @@ function show(page){
 }
 
 function renderBoard(){
-const c=document.getElementById("content");
+  const c = document.getElementById("content");
+  const ladderTeams = getLadderTeams(currentLadder);
 
+  const ladderNames = {
+    mens: "Men's Ladder",
+    womens: "Women's Ladder",
+    mixed: "Mixed Ladder"
+  };
 
-  let options='<option value="">Choose your team...</option>';
+  let options = '<option value="">Choose your team...</option>';
 
-teams.forEach((team,i)=>{
-  const canSelectTeam =
-    isAdmin() || userBelongsToTeam(team);
+  ladderTeams.forEach(function(team,ladderIndex){
+    const canSelectTeam =
+      isAdmin() || userBelongsToTeam(team);
 
-  if(!canSelectTeam){
-    return;
-  }
+    if(!canSelectTeam){
+      return;
+    }
 
-  options +=
-    '<option value="'+i+'" '+(team===myTeam?'selected':'')+'>'+
-    '#'+(i+1)+' — '+team.name+
-    '</option>';
-});
+    const mainIndex = teamIndex(team);
+
+    options +=
+      '<option value="' + mainIndex + '" ' +
+      (team === myTeam ? "selected" : "") + ">" +
+      "#" + (ladderIndex + 1) + " — " + team.name +
+      "</option>";
+  });
+
   const authHtml = currentUser
     ? "<div class='success'>" +
         "<b>Signed in:</b> " + currentUser.email + "<br><br>" +
-       
-"<button class='smallBtn' onclick='signOutUser()'>Sign Out</button>" +
+        "<button class='smallBtn' onclick='signOutUser()'>Sign Out</button>" +
       "</div>"
     : "<div class='warning'>" +
         "<b>You are viewing the public ladder.</b><br><br>" +
         "<button class='smallBtn' onclick='signInWithEmail()'>Sign In by Email</button>" +
       "</div>";
+
   const assignmentHtml =
-  currentUser &&
-  !isAdmin() &&
-  !findCurrentUsersTeam()
-    ? "<div class='warning'><b>Your account has not been assigned to a team yet.</b><br>Please contact the ladder administrator.</div>"
-    : "";
-    let html=
-   "<h2>Leaderboard</h2>"+
-authHtml+
-assignmentHtml+
-"<p><b>Which team are you?</b></p>"+
-    "<select onchange='selectTeam(this.value)'>"+options+"</select>";
+    currentUser &&
+    !isAdmin() &&
+    !findCurrentUsersTeam()
+      ? "<div class='warning'><b>Your account has not been assigned to a team in this ladder yet.</b><br>Please contact the ladder administrator.</div>"
+      : "";
 
-  const myIndex=myTeam ? teamIndex(myTeam) : -1;
+  let html =
+    "<h2>" + ladderNames[currentLadder] + "</h2>" +
+    authHtml +
+    "<p><b>Choose a ladder</b></p>" +
+    "<select onchange='selectLadder(this.value)' style='width:100%;padding:12px;font-size:16px;'>" +
+      "<option value='mens' " + (currentLadder === "mens" ? "selected" : "") + ">Men's Ladder</option>" +
+      "<option value='womens' " + (currentLadder === "womens" ? "selected" : "") + ">Women's Ladder</option>" +
+      "<option value='mixed' " + (currentLadder === "mixed" ? "selected" : "") + ">Mixed Ladder</option>" +
+    "</select>" +
+    assignmentHtml +
+    "<p><b>Which team are you?</b></p>" +
+    "<select onchange='selectTeam(this.value)'>" + options + "</select>";
 
+  const myIndex = myTeam ? ladderTeams.indexOf(myTeam) : -1;
 if(myIndex >= 0){
   const noticeIndexes = eligibleChallengeIndexes(myTeam);
 
@@ -783,8 +824,9 @@ if(myIndex >= 0){
       myTeam.name + ".</b> Your team is currently Away and cannot issue or receive challenges.</div>";
 
   }else if(noticeIndexes.length){
-    const availableRanks = noticeIndexes.map(function(index){
-      return "#" + (index + 1);
+    const availableRanks = noticeIndexes.map(function(mainIndex){
+      const opponent = teams[mainIndex];
+      return "#" + (ladderTeams.indexOf(opponent) + 1);
     }).join(", ");
 
     html +=
@@ -798,14 +840,15 @@ if(myIndex >= 0){
   }
 }
 
-  html+=
-    "<table>"+
-    "<tr><th>Rank</th><th>Team</th><th>Combined DUPR</th><th>W-L</th><th></th></tr>";
+html +=
+  "<table>" +
+  "<tr><th>Rank</th><th>Team</th><th>Combined DUPR</th><th>W-L</th><th></th></tr>";
 
- const challengeableIndexes =
+const challengeableIndexes =
   myTeam ? eligibleChallengeIndexes(myTeam) : [];
 
-teams.forEach((team,i)=>{
+ladderTeams.forEach(function(team,ladderIndex){
+  const i = teamIndex(team);
 
 const eligible = challengeableIndexes.includes(i);
     const mine=team===myTeam;
@@ -836,14 +879,14 @@ const rematchLocked = matchHistory.some(match => {
 });
 
     html+=
-      "<tr class='"+(i<10?"top10 ":"")+(mine?"myteam":"")+"'>"+
-      "<td><b>#"+(i+1)+"</b></td>"+
-      "<td><b>"+team.name+"</b>"+
-(teamAway ? "<div class='muted'>🏖️ Away</div>" : "")+
-"<div class='muted'>"+team.players+"</div></td>"+
-      "<td>"+(team.isNR ? "NR" : Number(team.dupr).toFixed(2))+"</td>"+
-      "<td>"+team.wins+"-"+team.losses+"</td>"+
-      "<td>";
+   "<tr class='"+(ladderIndex<10?"top10 ":"")+(mine?"myteam":"")+"'>"+
+  "<td><b>#"+(ladderIndex+1)+"</b></td>"+
+  "<td><b>"+team.name+"</b>"+
+    (teamAway ? "<div class='muted'>🏖️ Away</div>" : "")+
+    "<div class='muted'>"+team.players+"</div></td>"+
+  "<td>"+(team.isNR ? "NR" : Number(team.dupr).toFixed(2))+"</td>"+
+  "<td>"+team.wins+"-"+team.losses+"</td>"+
+  "<td>";
 
 if(teamAway){
 
@@ -1323,6 +1366,22 @@ async function cancelOverdueMatch(index){
   }
 
   renderAdminReview();
+}
+  function selectLadder(value){
+  if(!["mens","womens","mixed"].includes(value)){
+    return;
+  }
+
+  currentLadder = value;
+  historyTeam = null;
+  challenge = null;
+
+  myTeam =
+    currentUser && !isAdmin()
+      ? findCurrentUsersTeam()
+      : null;
+
+  renderBoard();
 }
 function selectTeam(value){
   if(value === ""){
