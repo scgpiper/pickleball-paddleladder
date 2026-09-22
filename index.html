@@ -2141,14 +2141,23 @@ async function rejectDecline(index){
   }
 
   const previousRanks = captureTeamRanks();
-  const decliningTeam = item.challenged;
-  const decliningIndex = teamIndex(decliningTeam);
+ const decliningTeam = item.challenged;
+const teamLadder = decliningTeam.ladder || "mens";
+const ladderTeams = getLadderTeams(teamLadder);
+const decliningLadderIndex = ladderTeams.indexOf(decliningTeam);
 
-  if(decliningIndex >= 0 && decliningIndex < teams.length - 1){
-    const teamBelow = teams[decliningIndex + 1];
-    teams[decliningIndex] = teamBelow;
-    teams[decliningIndex + 1] = decliningTeam;
-  }
+if(
+  decliningLadderIndex >= 0 &&
+  decliningLadderIndex < ladderTeams.length - 1
+){
+  const teamBelow = ladderTeams[decliningLadderIndex + 1];
+
+  const decliningMainIndex = teamIndex(decliningTeam);
+  const belowMainIndex = teamIndex(teamBelow);
+
+  teams[decliningMainIndex] = teamBelow;
+  teams[belowMainIndex] = decliningTeam;
+}
 
   recordLadderMovements(previousRanks, "Decline penalty");
 
