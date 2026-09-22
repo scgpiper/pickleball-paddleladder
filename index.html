@@ -351,36 +351,46 @@ function placeNewTeamByDupr(){
 
   if(!newTeam) return;
 
-  // NR teams always enter at the bottom
+  newTeam.ladder = newTeam.ladder || currentLadder || "mens";
+
+  const ladderTeams = getLadderTeams(newTeam.ladder);
+
+  function placeAtBottom(){
+    if(ladderTeams.length === 0){
+      teams.push(newTeam);
+      return;
+    }
+
+    const lastTeam = ladderTeams[ladderTeams.length - 1];
+    teams.splice(teamIndex(lastTeam) + 1, 0, newTeam);
+  }
+
+  // NR teams always enter at the bottom of their selected ladder.
   if(newTeam.isNR){
-    teams.push(newTeam);
+    placeAtBottom();
     return;
   }
 
   const newDupr = parseFloat(newTeam.dupr);
-  let insertIndex = teams.length;
+  let teamToPlaceBefore = null;
 
-  // Position 11 is index 10.
+  // Position 11 is index 10 within this specific ladder.
   // A new team's DUPR can never place it inside the Top 10.
-  for(let i = 10; i < teams.length; i++){
-    const existingDupr = parseFloat(teams[i].dupr);
+  for(let i = 10; i < ladderTeams.length; i++){
+    const existingDupr = parseFloat(ladderTeams[i].dupr);
 
     if(!isNaN(existingDupr) && newDupr > existingDupr){
-      insertIndex = i;
+      teamToPlaceBefore = ladderTeams[i];
       break;
     }
   }
 
-  teams.splice(insertIndex, 0, newTeam);
+  if(teamToPlaceBefore){
+    teams.splice(teamIndex(teamToPlaceBefore), 0, newTeam);
+  }else{
+    placeAtBottom();
+  }
 }
-let myTeam = null;
-  let currentLadder = "mens";
-  let historyTeam = null;
- let partnerListings = [];
-  let createdTeams = [];
-  let partnerInvites = [];
-let challenge = null;
-
 function teamIndex(team){
   return teams.indexOf(team);
 }
@@ -515,6 +525,42 @@ if(!emails.length){
 
   if(invalidEmail){
     alert("Please enter valid email addresses.");
+    return;
+  }
+
+  const teamLadder = team.ladder || "mens";
+
+  const duplicateEmail = emails.find(function(email){
+    return teams.some(function(otherTeam){
+      return (
+        otherTeam !== team &&
+        (otherTeam.ladder || "mens") === teamLadder &&
+        Array.isArray(otherTeam.memberEmails) &&
+        otherTeam.memberEmails.some(function(existingEmail){
+          return String(existingEmail).toLowerCase() === email;
+        })
+      );
+    });
+  });
+
+  if(duplicateEmail){
+    const assignedTeam = teams.find(function(otherTeam){
+      return (
+        otherTeam !== team &&
+        (otherTeam.ladder || "mens") === teamLadder &&
+        Array.isArray(otherTeam.memberEmails) &&
+        otherTeam.memberEmails.some(function(existingEmail){
+          return String(existingEmail).toLowerCase() === duplicateEmail;
+        })
+      );
+    });
+
+    alert(
+      duplicateEmail +
+      " is already assigned to " +
+      assignedTeam.name +
+      " in this ladder."
+    );
     return;
   }
 
@@ -687,25 +733,40 @@ function eligibleChallengeIndexes(team){
   }) || null;
 }
 function captureTeamRanks(){
-  return teams.map(function(team,index){
+  return teams.map(function(team){
+    const teamLadder = team.ladder || "mens";
+    const ladderTeams = getLadderTeams(teamLadder);
+
     return {
       team: team,
-      rank: index + 1
+      ladder: teamLadder,
+      rank: ladderTeams.indexOf(team) + 1
     };
   });
 }
 
 function recordLadderMovements(previousRanks,reason){
   previousRanks.forEach(function(item){
-    const newIndex = teamIndex(item.team);
+    if(!teams.includes(item.team)){
+      return;
+    }
 
-    if(newIndex === -1) return;
+    const ladderTeams = getLadderTeams(
+      item.ladder || item.team.ladder || "mens"
+    );
+
+    const newIndex = ladderTeams.indexOf(item.team);
+
+    if(newIndex === -1){
+      return;
+    }
 
     const newRank = newIndex + 1;
 
     if(newRank !== item.rank){
       ladderMovementHistory.push({
         team: item.team.name,
+        ladder: item.ladder || item.team.ladder || "mens",
         fromRank: item.rank,
         toRank: newRank,
         reason: reason,
