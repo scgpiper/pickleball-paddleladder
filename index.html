@@ -14,15 +14,59 @@ body{
 }
 
 header{
-  background:#102d34;
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  background:linear-gradient(115deg,#102d34 12%,#135247 100%);
   color:#fff;
   border-bottom:5px solid #d7ed3d;
   padding:28px 22px;
+}
+.court-art{
+  position:absolute;
+  z-index:0;
+  right:5%;
+  top:50%;
+  width:430px;
+  height:195px;
+  box-sizing:border-box;
+  border:2px solid rgba(231,255,238,.55);
+  background:rgba(65,155,125,.14);
+  transform:translateY(-50%) rotate(-12deg);
+  pointer-events:none;
+}
+.court-art::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:0;
+  bottom:0;
+  border-left:3px solid rgba(231,255,238,.65);
+}
+.court-art::after{
+  content:"";
+  position:absolute;
+  left:33%;
+  right:33%;
+  top:0;
+  bottom:0;
+  border-left:2px solid rgba(231,255,238,.55);
+  border-right:2px solid rgba(231,255,238,.55);
+}
+.court-center{
+  position:absolute;
+  left:0;
+  right:0;
+  top:50%;
+  height:2px;
+  background:linear-gradient(90deg,rgba(231,255,238,.55) 0 33%,transparent 33% 67%,rgba(231,255,238,.55) 67% 100%);
 }
 
 header h1{margin:0;font-size:clamp(26px,4vw,36px);letter-spacing:-.03em}
 header p{margin:7px 0 0;color:#d6e6e3}
 .header-inner{
+  position:relative;
+  z-index:1;
   max-width:1000px;
   margin:auto;
   display:flex;
@@ -173,6 +217,7 @@ select{
 
 @media(max-width:650px){
   header{padding:23px 17px}
+  .court-art{right:-100px;width:300px;height:145px;opacity:.65}
   .header-inner{align-items:flex-start}
   .sponsor{padding-left:12px}
   .sponsor-name{font-size:13px}
@@ -194,6 +239,7 @@ select{
 
 <body>
 <header>
+  <div class="court-art" aria-hidden="true"><span class="court-center"></span></div>
   <div class="header-inner">
     <div>
       <div class="header-kicker">Club challenge ladder</div>
