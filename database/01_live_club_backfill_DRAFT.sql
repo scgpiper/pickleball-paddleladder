@@ -10,6 +10,9 @@ declare
   vpa_id uuid;
   relation_name text;
 begin
+  if (select count(*) from public.clubs where lower(slug) = 'vpa') > 1 then
+    raise exception 'More than one club has a VPA slug; resolve before migration';
+  end if;
   select id into vpa_id from public.clubs where lower(slug) = 'vpa';
   if vpa_id is null then
     insert into public.clubs (slug, name, active)
