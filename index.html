@@ -9,24 +9,55 @@
 body{
   margin:0;
   font-family:Arial,sans-serif;
-  background:#f4f7fb;
-  color:#10213b;
+  background:#f3f6f3;
+  color:#183239;
 }
 
 header{
-  background:#0d2f63;
+  background:#102d34;
   color:#fff;
-  padding:22px;
-  text-align:center;
+  border-bottom:5px solid #d7ed3d;
+  padding:28px 22px;
 }
 
-header h1{margin:0;font-size:28px}
-header p{margin:6px 0 0}
+header h1{margin:0;font-size:clamp(26px,4vw,36px);letter-spacing:-.03em}
+header p{margin:7px 0 0;color:#d6e6e3}
+.header-inner{
+  max-width:1000px;
+  margin:auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+}
+.header-kicker{
+  color:#d7ed3d;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  margin-bottom:8px;
+}
+.sponsor{
+  flex:0 0 auto;
+  text-align:right;
+  border-left:1px solid #547076;
+  padding-left:22px;
+}
+.sponsor-label{
+  display:block;
+  color:#abc7c5;
+  font-size:11px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  margin-bottom:5px;
+}
+.sponsor-name{font-size:18px;font-weight:800;color:#d7ed3d}
 
 main{
-  max-width:850px;
+  max-width:1000px;
   margin:auto;
-  padding:18px;
+  padding:24px 18px 50px;
 }
 
 .grid{
@@ -35,18 +66,25 @@ main{
   gap:12px;
 }
 
+.grid button{min-height:66px;text-align:left;padding:16px 20px}
+.grid button:first-child{background:#d7ed3d;color:#163139}
+.grid button:first-child:hover{background:#c8df2d}
+
 button{
   border:0;
-  border-radius:14px;
-  padding:18px 10px;
-  background:#1261c9;
+  border-radius:12px;
+  padding:16px 14px;
+  background:#176678;
   color:#fff;
-  font-size:18px;
-  font-weight:bold;
+  font-size:17px;
+  font-weight:700;
   cursor:pointer;
+  transition:background .15s ease,transform .15s ease;
+  box-shadow:0 2px 5px rgba(12,45,54,.12);
 }
 
-button:hover{background:#0d4fa8}
+button:hover{background:#125263;transform:translateY(-1px)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #9ac418;outline-offset:2px}
 
 .challengeBtn,
 .smallBtn{
@@ -66,10 +104,12 @@ button:hover{background:#0d4fa8}
 
 .card{
   background:#fff;
-  border:1px solid #dbe4ef;
-  border-radius:14px;
-  padding:16px;
-  margin-top:16px;
+  border:1px solid #dce7e3;
+  border-radius:16px;
+  padding:clamp(16px,3vw,28px);
+  margin-top:22px;
+  box-shadow:0 8px 24px rgba(11,45,48,.06);
+  overflow-x:auto;
 }
 
 table{
@@ -79,12 +119,12 @@ table{
 
 th,td{
   padding:10px 6px;
-  border-bottom:1px solid #edf1f6;
+  border-bottom:1px solid #e7eeea;
   text-align:left;
 }
 
-.top10{background:#fff9dc}
-.myteam{outline:3px solid #1261c9}
+.top10{background:#f8fbe9}
+.myteam{outline:3px solid #bbd932}
 
 .muted{
   color:#6b778c;
@@ -99,7 +139,7 @@ th,td{
   margin:12px 0;
 }
 
-.notice{background:#eaf3ff}
+.notice{background:#e8f4f5}
 .success{background:#eaf8ee}
 .warning{background:#fff3cd}
 
@@ -129,17 +169,37 @@ select{
 }
 
 @media(max-width:650px){
-  .grid{grid-template-columns:1fr}
+  header{padding:23px 17px}
+  .header-inner{align-items:flex-start}
+  .sponsor{padding-left:12px}
+  .sponsor-name{font-size:13px}
+  .sponsor-label{font-size:9px}
+  main{padding:16px 12px 32px}
+  .grid{grid-template-columns:1fr 1fr;gap:9px}
+  .grid button{min-height:64px;padding:11px;font-size:14px;text-align:center}
   th:nth-child(3),td:nth-child(3){display:none}
+}
+@media(max-width:390px){
+  .header-inner{display:block}
+  .sponsor{display:inline-block;margin-top:16px;padding-left:0;border-left:0;text-align:left}
+  .grid{grid-template-columns:1fr}
 }
 </style>
 </head>
 
 <body>
-<!-- Redeploy trigger -->
 <header>
-  <h1>Pickleball PaddleLadder</h1>
-  <p>Challenge. Compete. Climb.</p>
+  <div class="header-inner">
+    <div>
+      <div class="header-kicker">Club challenge ladder</div>
+      <h1>Pickleball PaddleLadder</h1>
+      <p>Challenge. Compete. Climb.</p>
+    </div>
+    <div class="sponsor" aria-label="Presented by Pickleball Patrol">
+      <span class="sponsor-label">Presented by</span>
+      <span class="sponsor-name">Pickleball Patrol</span>
+    </div>
+  </div>
 </header>
 
 <main>
