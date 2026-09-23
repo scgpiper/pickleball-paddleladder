@@ -1341,7 +1341,8 @@ function renderAdminReview(){
  
 const reviews=pendingChallenges.filter(item =>
   item.status==="Decline Pending Admin Review" ||
-  item.status==="Overdue"
+  item.status==="Overdue" ||
+  item.status==="Disputed"
 );
 const awayReviews = teams.filter(function(team){
   return isAwayReviewDue(team);
@@ -1365,6 +1366,14 @@ reviews.forEach((item,index)=>{
 "<button class='declineBtn smallBtn' onclick='recordOverdueForfeit("+index+")'>Record Forfeit</button> "+
 "<button class='declineBtn smallBtn' onclick='cancelOverdueMatch("+index+")'>Cancel Match</button>"+
 "</div>";
+}else if(item.status==="Disputed"){
+    c.innerHTML+=
+      "<div class='warning'>"+
+      "<b>"+item.challenger.name+" vs. "+item.challenged.name+"</b><br><br>"+
+      "<b>Reason:</b> The submitted result was disputed.<br><br>"+
+      "<b>Status:</b> Waiting for Admin to reopen score entry.<br><br>"+
+      "<button class='acceptBtn smallBtn' onclick='adminReopenDisputedResult("+index+")'>Reopen Score Entry</button>"+
+      "</div>";
 }else{
     c.innerHTML+=
       "<div class='warning'>"+
@@ -1474,7 +1483,8 @@ reviews.forEach((item,index)=>{
 
   const reviews = pendingChallenges.filter(item =>
     item.status === "Decline Pending Admin Review" ||
-    item.status === "Overdue"
+    item.status === "Overdue" ||
+    item.status === "Disputed"
   );
 
   const item = reviews[index];
@@ -1500,7 +1510,8 @@ reviews.forEach((item,index)=>{
 
   const reviews = pendingChallenges.filter(item =>
     item.status === "Decline Pending Admin Review" ||
-    item.status === "Overdue"
+    item.status === "Overdue" ||
+    item.status === "Disputed"
   );
 
   const item = reviews[index];
@@ -1540,7 +1551,8 @@ async function cancelOverdueMatch(index){
 
   const reviews = pendingChallenges.filter(item =>
     item.status === "Decline Pending Admin Review" ||
-    item.status === "Overdue"
+    item.status === "Overdue" ||
+    item.status === "Disputed"
   );
 
   const item = reviews[index];
@@ -1989,7 +2001,8 @@ async function approveDecline(index){
 
   const reviews = pendingChallenges.filter(item =>
     item.status === "Decline Pending Admin Review" ||
-    item.status === "Overdue"
+    item.status === "Overdue" ||
+    item.status === "Disputed"
   );
 
   const item = reviews[index];
@@ -2016,7 +2029,8 @@ async function rejectDecline(index){
 
   const reviews = pendingChallenges.filter(item =>
     item.status === "Decline Pending Admin Review" ||
-    item.status === "Overdue"
+    item.status === "Overdue" ||
+    item.status === "Disputed"
   );
 
   const item = reviews[index];
@@ -2302,47 +2316,40 @@ if(!canManageTeam(myTeam)){
   }
 }
 
-async function resetResult(){
-  if(!currentUser){
-    alert("Please sign in before re-entering a result.");
-    return;
-  }
-if(!canManageTeam(myTeam)){
-  alert("Your account is not assigned to this team.");
-  return;
-}
-  if(
-    !challenge ||
-    challenge.status !== "Disputed" ||
-    challenge.submittedBy !== myTeam
-  ){
-    alert("Only the team that submitted the result can re-enter it.");
+async function adminReopenDisputedResult(index){
+  if(!isAdmin()){
+    alert("Only the ladder administrator can reopen disputed score entry.");
     return;
   }
 
-  const historyItem = challengeHistory.findLast(item =>
-    item.challenger === challenge.challenger.name &&
-    item.challenged === challenge.challenged.name &&
+  const reviews = pendingChallenges.filter(item =>
+    item.status === "Decline Pending Admin Review" ||
+    item.status === "Overdue" ||
     item.status === "Disputed"
   );
 
-  if(historyItem){
-    historyItem.status = "Accepted";
-    historyItem.resetAt = Date.now();
+  const item = reviews[index];
+
+  if(!item || item.status !== "Disputed"){
+    alert("This disputed result could not be found.");
+    return;
   }
 
-  challenge.scores = null;
-  challenge.winner = null;
-  challenge.submittedBy = null;
-  challenge.status = "Accepted";
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
+  if(!confirm(
+    "Reopen score entry for " + item.challenger.name +
+    " vs. " + item.challenged.name + "?"
+  )){
+    return;
   }
 
-  show("score");
+  if(await callSecureFunction(
+    "admin_reset_disputed_result_secure",
+    { requested_challenge_id: item.id },
+    "Reopening score entry"
+  )){
+    alert("Score entry has been reopened.");
+    renderAdminReview();
+  }
 }
 
 function updateRecordsAndLadder(){
