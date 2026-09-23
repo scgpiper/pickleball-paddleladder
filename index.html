@@ -1399,7 +1399,9 @@ reviews.forEach((item,index)=>{
       "<button class='acceptBtn smallBtn' onclick='adminReactivateAway(" +
         index + ")'>Reactivate Team</button> " +
       "<button class='smallBtn' onclick='extendAwayStatus(" +
-        index + ")'>Extend Away 30 Days</button>" +
+        index + ")'>Extend Away 30 Days</button> " +
+      "<button class='declineBtn smallBtn' onclick='removeAwayTeam(" +
+        index + ")'>Remove Team</button>" +
     "</div>";
 });
 }
@@ -1473,7 +1475,14 @@ reviews.forEach((item,index)=>{
     return;
   }
 
-  alert("Secure Away-team removal needs one final database function before it can be enabled.");
+  if(await callSecureFunction(
+    "admin_remove_team_secure",
+    { requested_team_id: team.id },
+    "Removing expired Away team"
+  )){
+    alert(team.name + " was removed.");
+    renderAdminReview();
+  }
 }
  async function extendOverdueMatch(index){
   if(!isAdmin()){
