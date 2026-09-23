@@ -234,6 +234,52 @@ select{
   .sponsor{display:inline-block;margin-top:16px;padding-left:0;border-left:0;text-align:left}
   .grid{grid-template-columns:1fr}
 }
+
+/* Read-only lobby screen. Keep normal navigation unchanged. */
+#lobbyScreen[hidden]{display:none}
+body.lobby-mode{background:#0c2b32;color:#fff;overflow:hidden}
+body.lobby-mode > header,body.lobby-mode > main{display:none}
+.lobby-shell{
+  position:fixed;inset:0;box-sizing:border-box;display:flex;flex-direction:column;
+  gap:clamp(12px,2vh,24px);padding:clamp(16px,2.5vh,36px) clamp(18px,3vw,58px);
+  background:radial-gradient(circle at 85% 0%,#196455 0%,#102d34 55%,#0b272e 100%);
+}
+.lobby-head{display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:0}
+.lobby-eyebrow{color:#d7ed3d;text-transform:uppercase;letter-spacing:.16em;font-size:clamp(12px,1.3vw,19px);font-weight:800}
+.lobby-head h1{margin:5px 0 0;font-size:clamp(30px,3.6vw,60px);line-height:1.05}
+.lobby-brand{display:flex;align-items:center;gap:16px;flex:0 0 auto}
+.lobby-brand span{font-size:clamp(12px,1.2vw,18px);font-weight:800;color:#d7ed3d;text-align:right}
+.lobby-brand img{width:clamp(76px,10vh,140px);height:clamp(76px,10vh,140px);object-fit:contain}
+.lobby-panel{min-height:0;flex:1;display:flex;flex-direction:column;background:#fff;color:#173238;border-radius:22px;overflow:hidden;box-shadow:0 18px 55px rgba(0,0,0,.25)}
+.lobby-panel-head{padding:clamp(14px,2vh,26px) clamp(20px,2.5vw,44px);background:#eaf5d0;display:flex;align-items:baseline;justify-content:space-between;gap:20px}
+.lobby-panel h2{font-size:clamp(26px,3vw,48px);line-height:1.1;margin:0}
+.lobby-panel-head span{font-size:clamp(14px,1.3vw,20px);font-weight:700;color:#476055;white-space:nowrap}
+.lobby-table-wrap{min-height:0;overflow:hidden;flex:1}
+.lobby-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:clamp(16px,2vw,30px)}
+.lobby-table th{font-size:clamp(12px,1.3vw,19px);text-transform:uppercase;letter-spacing:.08em;color:#52716e;background:#f5f9f7}
+.lobby-table th,.lobby-table td{padding:clamp(7px,1.05vh,15px) clamp(10px,2vw,35px);border-bottom:1px solid #dfe9e4}
+.lobby-table th:first-child,.lobby-table td:first-child{width:9%;font-weight:800;color:#176678}
+.lobby-table th:nth-child(2){width:49%}
+.lobby-table th:nth-child(3){width:20%}
+.lobby-team{font-weight:800}
+.lobby-players{font-size:.64em;color:#667975;margin-top:3px;font-weight:400}
+.lobby-table tbody tr:nth-child(-n+3){background:#f8fbe9}
+.lobby-empty{font-size:clamp(23px,2.6vw,38px);text-align:center;padding:10vh 20px;color:#36554e}
+.lobby-foot{display:flex;justify-content:space-between;align-items:center;gap:18px;font-size:clamp(13px,1.45vw,22px)}
+.lobby-foot strong{color:#d7ed3d}
+.lobby-foot .lobby-url{color:#fff;font-weight:800}
+.lobby-dots{display:flex;gap:10px;align-items:center}
+.lobby-dot{display:block;width:11px;height:11px;border-radius:50%;background:#5d8b81}
+.lobby-dot.active{background:#d7ed3d;transform:scale(1.3)}
+@media(max-width:700px){
+  .lobby-shell{gap:10px}
+  .lobby-brand span{display:none}
+  .lobby-panel-head{display:block}
+  .lobby-panel-head span{display:block;margin-top:4px}
+  .lobby-table th:nth-child(3),.lobby-table td:nth-child(3){display:none}
+  .lobby-table th:nth-child(2){width:auto}
+  .lobby-foot{align-items:flex-start}
+}
 </style>
 </head>
 
@@ -255,6 +301,28 @@ select{
     </div>
   </div>
 </header>
+
+<section id="lobbyScreen" class="lobby-shell" hidden aria-label="Rotating public leaderboard">
+  <div class="lobby-head">
+    <div><div class="lobby-eyebrow">Pickleball PaddleLadder · Live standings</div><h1>VPA Leaderboard</h1></div>
+    <div class="lobby-brand"><span>Presented by<br>Pickleball Patrol</span><img src="Pickleball-Patrol-transparent%20(1).png" alt="Pickleball Patrol logo"></div>
+  </div>
+  <div class="lobby-panel">
+    <div class="lobby-panel-head"><h2 id="lobbyTitle">Men's Ladder</h2><span id="lobbyCount">Loading standings…</span></div>
+    <div class="lobby-table-wrap">
+      <table class="lobby-table" aria-label="Top ten teams">
+        <thead><tr><th scope="col">Rank</th><th scope="col">Team</th><th scope="col">Combined DUPR</th><th scope="col">W–L</th></tr></thead>
+        <tbody id="lobbyRows"></tbody>
+      </table>
+      <div class="lobby-empty" id="lobbyEmpty" hidden></div>
+    </div>
+  </div>
+  <div class="lobby-foot">
+    <div><strong>Want to play?</strong> Visit <span class="lobby-url">pickleball-paddleladder.vercel.app</span></div>
+    <div class="lobby-dots" aria-label="Men's, Women's, and Mixed ladders"><span class="lobby-dot active"></span><span class="lobby-dot"></span><span class="lobby-dot"></span></div>
+  </div>
+</section>
+
 
 <main>
 
@@ -3124,6 +3192,87 @@ async function cancelPartnerInvite(index){
   }
 }
   
+
+const LOBBY_LADDERS = [
+  { key:"mens", title:"Men's Ladder" },
+  { key:"womens", title:"Women's Ladder" },
+  { key:"mixed", title:"Mixed Ladder" }
+];
+const LOBBY_ROTATION_MS = 12000;
+let lobbyIndex = 0;
+let lobbyTeams = [];
+let lobbyLoaded = false;
+let lobbyLastUpdated = "";
+
+function renderLobby(){
+  const ladder = LOBBY_LADDERS[lobbyIndex];
+  const rows = lobbyTeams
+    .filter(team => (team.ladder || "mens") === ladder.key)
+    .sort((a,b) => Number(a.rank_position) - Number(b.rank_position))
+    .slice(0,10);
+  const tbody = document.getElementById("lobbyRows");
+  const empty = document.getElementById("lobbyEmpty");
+  document.getElementById("lobbyTitle").textContent = ladder.title;
+  document.getElementById("lobbyCount").textContent =
+    (lobbyLoaded ? "Top " + rows.length + " teams" : "Loading standings…") +
+    (lobbyLastUpdated ? " · Updated " + lobbyLastUpdated : "");
+  tbody.replaceChildren();
+  empty.hidden = !lobbyLoaded || rows.length > 0;
+  empty.textContent = rows.length ? "" : "New teams welcome — ask your club how to join!";
+  rows.forEach(function(team,index){
+    const tr = document.createElement("tr");
+    const rank = document.createElement("td");
+    rank.textContent = "#" + (index + 1);
+    const name = document.createElement("td");
+    const strong = document.createElement("div");
+    strong.className = "lobby-team";
+    strong.textContent = team.name || "Team";
+    const players = document.createElement("div");
+    players.className = "lobby-players";
+    players.textContent = Array.isArray(team.players) ? team.players.join(" / ") : (team.players || "");
+    name.append(strong,players);
+    const dupr = document.createElement("td");
+    const rating = Number(team.dupr);
+    dupr.textContent = team.is_nr || team.dupr == null || !Number.isFinite(rating) ? "NR" : rating.toFixed(2);
+    const record = document.createElement("td");
+    record.textContent = String(Number(team.wins) || 0) + "–" + String(Number(team.losses) || 0);
+    tr.append(rank,name,dupr,record);
+    tbody.append(tr);
+  });
+  document.querySelectorAll(".lobby-dot").forEach(function(dot,index){
+    dot.classList.toggle("active",index === lobbyIndex);
+  });
+}
+
+async function refreshLobby(){
+  const result = await dbClient.from("ladder_teams")
+    .select("ladder,rank_position,name,players,dupr,is_nr,wins,losses")
+    .order("rank_position");
+  if(result.error){
+    console.error("Could not refresh lobby standings:",result.error);
+    if(!lobbyLoaded){
+      document.getElementById("lobbyCount").textContent = "Standings temporarily unavailable";
+    }
+    return;
+  }
+  lobbyTeams = result.data || [];
+  lobbyLoaded = true;
+  lobbyLastUpdated = new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
+  renderLobby();
+}
+
+function startLobbyScreen(){
+  document.body.classList.add("lobby-mode");
+  document.getElementById("lobbyScreen").hidden = false;
+  renderLobby();
+  refreshLobby();
+  window.setInterval(function(){
+    lobbyIndex = (lobbyIndex + 1) % LOBBY_LADDERS.length;
+    renderLobby();
+  },LOBBY_ROTATION_MS);
+  window.setInterval(refreshLobby,60000);
+}
+
 async function startApp(){
   await loadCurrentUser();
 
@@ -3151,7 +3300,11 @@ if(!currentUser){
   show("board");
 }
 
-startApp();
+if(new URLSearchParams(window.location.search).get("screen") === "lobby"){
+  startLobbyScreen();
+}else{
+  startApp();
+}
 </script>
 
 </body>
