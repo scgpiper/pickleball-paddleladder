@@ -304,7 +304,7 @@ body.lobby-mode > header,body.lobby-mode > main{display:none}
 
 <section id="lobbyScreen" class="lobby-shell" hidden aria-label="Rotating public leaderboard">
   <div class="lobby-head">
-    <div><div class="lobby-eyebrow">Pickleball PaddleLadder · Live standings</div><h1>VPA Leaderboard</h1></div>
+    <div><div class="lobby-eyebrow">Pickleball PaddleLadder · Live standings</div><h1 id="lobbyClubTitle">VPA Leaderboard</h1></div>
     <div class="lobby-brand"><span>Presented by<br>Pickleball Patrol</span><img src="Pickleball-Patrol-transparent%20(1).png" alt="Pickleball Patrol logo"></div>
   </div>
   <div class="lobby-panel">
@@ -3193,12 +3193,12 @@ async function cancelPartnerInvite(index){
 }
   
 
+const LOBBY_CONFIG = Object.freeze({ clubName:"VPA", rotationMs:12000, refreshMs:60000 });
 const LOBBY_LADDERS = [
   { key:"mens", title:"Men's Ladder" },
   { key:"womens", title:"Women's Ladder" },
   { key:"mixed", title:"Mixed Ladder" }
 ];
-const LOBBY_ROTATION_MS = 12000;
 let lobbyIndex = 0;
 let lobbyTeams = [];
 let lobbyLoaded = false;
@@ -3263,14 +3263,15 @@ async function refreshLobby(){
 
 function startLobbyScreen(){
   document.body.classList.add("lobby-mode");
+  document.getElementById("lobbyClubTitle").textContent = LOBBY_CONFIG.clubName + " Leaderboard";
   document.getElementById("lobbyScreen").hidden = false;
   renderLobby();
   refreshLobby();
   window.setInterval(function(){
     lobbyIndex = (lobbyIndex + 1) % LOBBY_LADDERS.length;
     renderLobby();
-  },LOBBY_ROTATION_MS);
-  window.setInterval(refreshLobby,60000);
+  },LOBBY_CONFIG.rotationMs);
+  window.setInterval(refreshLobby,LOBBY_CONFIG.refreshMs);
 }
 
 async function startApp(){
