@@ -2,7 +2,7 @@
 
 ## Goal
 
-One Supabase sign-in can belong to teams at several clubs. Every leaderboard, challenge, score, partner action, and club administrator action is scoped to the selected club. Existing VPA records and the current URL remain attached to VPA. No other club is populated with VPA teams.
+Each club has its own registration link. A regular player registers with one club, and teams sign up on that club's page only; the application rejects attempts to join another club with the same account. Every leaderboard, challenge, score, partner action, and club administrator action is scoped to the selected club. Existing VPA records and the current URL remain attached to VPA. No other club is populated with VPA teams.
 
 ## Existing app inventory
 
@@ -15,8 +15,8 @@ Its mutations use: `admin_assign_team_members_secure`, `set_team_away_secure`, `
 ## Proposed database boundaries
 
 - `public.clubs`: stable UUID, unique URL slug, display name, optional branding and active flag. Public clients can read active club names and slugs, but only authorized administrators can change their own club metadata.
-- `private.club_admins`: `(club_id, user_id)` unique membership. An auth user can administer several clubs; managing one club grants no access to another. If the existing global app administrator must retain a platform role, keep that role explicit and separate from a club admin role.
-- Existing `private.team_members` stays a many-to-many team membership relation. The same user may have a VPA team and a different team at another club. Membership is determined by the team's club, not by a single `club_id` on `auth.users`.
+- `private.club_admins`: `(club_id, user_id)` unique membership. A club administrator is assigned to one club and has no access to another club's private records. The existing platform owner may keep a separately authorized platform role for provisioning. If the existing global app administrator must retain a platform role, keep that role explicit and separate from a club admin role.
+- Add `private.club_memberships` (or an equivalent club-bound registration record) with a unique `user_id` and unique normalized email across clubs for regular players, while allowing several teams *within* that one club if club rules permit. Existing `private.team_members` remains the team roster; every roster change must verify the player is registered with the team's club. An emailed player invite may create a pending club registration, but acceptance must fail if that email or account already belongs to another club. Do not require a new Supabase Auth project for each club.
 - Add a non-null `club_id` to each directly queried club-owned table: `ladder_teams`, `challenges`, `ladder_movements`, `partner_listings`, and `partner_invites`. Derive and backfill each dependent row from its referenced team or listing where possible, checking for conflicting references. `private.team_members` may inherit its club exclusively through its team foreign key; add a denormalized club ID there only if existing functions or performance require it.
 - Replace uniqueness scoped only to ladder or email with appropriate club-aware uniqueness where required. Preserve a team primary key and use composite foreign keys or checked functions so related IDs cannot connect rows from different clubs.
 - Enable and verify RLS and grants for every exposed table. Public standings may be readable by club; private emails and user IDs must remain restricted. Set each SECURITY DEFINER function's search path and validate both the caller's club authority and the club of **every** referenced row. Client-provided club IDs are context, not proof of permission. For a team action, derive the club from that team and verify every other team, challenge, invite and listing belongs to it.
@@ -24,13 +24,17 @@ Its mutations use: `admin_assign_team_members_secure`, `set_team_away_secure`, `
 
 ## App behavior
 
-Resolve `?club=<slug>` from `clubs`, defaulting to VPA for preexisting links. Display the resolved club name in app header and lobby, with `?club=<slug>&screen=lobby` as a shareable screen link. A missing or inactive slug shows a clear error instead of another club's standings. Filter all five table reads by the resolved club ID; reset selected team, challenge, history, and admin state when clubs change. Evaluate admin access against the selected club and pass club context to functions that require it. An account can switch clubs without signing out. New club creation and first admin assignment must be a platform-admin-only operation; public visitors cannot self-create a club or appoint themselves.
+Resolve `?club=<slug>` from `clubs`, defaulting to VPA for preexisting links. Display the resolved club name in app header and lobby, with `?club=<slug>&screen=lobby` as a shareable screen link. A missing or inactive slug shows a clear error instead of another club's standings. Filter all five table reads by the resolved club ID; reset selected team, challenge, history, and admin state when clubs change. Evaluate admin access against the selected club and pass club context to functions that require it. A regular player cannot switch registration to another club by changing the URL; visiting another club's public link shows its public leaderboard only and does not grant team or admin actions. Sign-in links should return to the club URL that initiated sign-in, and a signed-in user must be told when that account belongs to a different club. New club creation and first admin assignment must be a platform-admin-only operation; public visitors cannot self-create a club or appoint themselves.
+
+## Registration rule
+
+Club membership belongs to the account, and team enrollment belongs to the selected club. The same account cannot enroll in two clubs under the current requirement. A future transfer, if needed, must be an explicit admin-controlled workflow that resolves existing teams, invitations, and challenge history; merely changing a club URL never transfers membership. Existing VPA users must be backfilled from their roster records, and any conflicting historical roster associations must be reviewed before enforcing one-club uniqueness.
 
 ## Migration order
 
 1. Export metadata with `inspect_schema_readonly.sql`; review columns, existing keys, policies, triggers, and exact function bodies. Inventory currently reads *definitions*, not rows.
 2. Build a transaction-safe migration from the **actual** schema. Insert VPA, backfill existing records, add constraints and indexes, and install per-club policies/functions. Detect inconsistent or orphaned historical rows before committing.
-3. Verify production data counts and representative VPA standings before and after in a read-only check; exercise signed-out visitor, player at two clubs, club A admin, club B admin, and platform admin against allowed and denied operations. Confirm cross-club IDs are rejected by RPCs even if a client bypasses page filters.
+3. Verify production data counts and representative VPA standings before and after in a read-only check; exercise signed-out visitor, club A player attempting club B enrollment, club A admin, club B admin, and platform admin against allowed and denied operations. Confirm cross-club IDs are rejected by RPCs even if a client bypasses page filters.
 4. Deploy the compatible frontend after the migration and verify the old URL, VPA lobby, and each newly provisioned club URL. Add other clubs only after the isolation tests pass.
 
 ## Current state
