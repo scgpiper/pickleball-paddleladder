@@ -7,16 +7,8 @@ create or replace function public.is_ladder_club_admin(requested_club_id uuid)
 returns boolean
 language sql stable security definer set search_path to ''
 as $function$
-  select auth.uid() is not null and (
-    public.is_app_admin()
-    or exists (
-      select 1 from public.club_memberships m
-      where m.club_id = requested_club_id
-        and m.user_id = auth.uid()
-        and m.status = 'active'
-        and m.role in ('admin', 'owner')
-    )
-  );
+  select auth.uid() is not null
+    and (public.is_app_admin() or public.is_club_admin(requested_club_id));
 $function$;
 
 -- A signed-in player chooses a club via its own active club page.
