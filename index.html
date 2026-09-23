@@ -268,6 +268,9 @@ async function loadLadderState(){
     dbClient.from("partner_listings").select("*").eq("status", "Active").order("created_at", { ascending: false }),
     currentUser
       ? dbClient.from("partner_invites").select("*").order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    currentUser && isAdmin()
+      ? dbClient.rpc("admin_get_team_members_secure")
       : Promise.resolve({ data: [], error: null })
   ]);
 
@@ -294,9 +297,31 @@ async function loadLadderState(){
       away: row.away === true,
       awayStartedAt: timestampToMilliseconds(row.away_started_at),
       awayReviewAt: timestampToMilliseconds(row.away_review_at),
-      belongsToCurrentUser: false
+      belongsToCurrentUser: false,
+      memberEmails: [],
+      memberUserIds: []
     };
   });
+
+  if(currentUser && isAdmin()){
+    (results[5].data || []).forEach(function(row){
+      const team = teams.find(function(item){
+        return item.id === row.team_id;
+      });
+
+      if(!team){
+        return;
+      }
+
+      if(row.email){
+        team.memberEmails.push(String(row.email).toLowerCase());
+      }
+
+      if(row.user_id){
+        team.memberUserIds.push(row.user_id);
+      }
+    });
+  }
 
   if(currentUser && !isAdmin()){
     const membershipChecks = await Promise.all(
@@ -556,7 +581,7 @@ function findCurrentUsersTeam(){
     );
   }) || null;
 }
-  async function assignTeamMembers(index){
+async function assignTeamMembers(index){
   if(!isAdmin()){
     alert("Only Admin can assign player emails to a team.");
     return;
@@ -594,19 +619,18 @@ function findCurrentUsersTeam(){
   const emails = [
     playerOneEmail.trim().toLowerCase(),
     playerTwoEmail.trim().toLowerCase()
-  ].filter(function(email){
+  ];
+
+  const nonBlankEmails = emails.filter(function(email){
     return email !== "";
   });
 
-if(!emails.length){
-  if(!confirm("Remove all assigned player emails from " + team.name + "?")){
+  if(!nonBlankEmails.length &&
+     !confirm("Remove all assigned player emails from " + team.name + "?")){
     return;
   }
 
-  team.memberEmails = [];
-
-}else{
-  const invalidEmail = emails.find(function(email){
+  const invalidEmail = nonBlankEmails.find(function(email){
     return !email.includes("@");
   });
 
@@ -615,54 +639,18 @@ if(!emails.length){
     return;
   }
 
-  const teamLadder = team.ladder || "mens";
-
-  const duplicateEmail = emails.find(function(email){
-    return teams.some(function(otherTeam){
-      return (
-        otherTeam !== team &&
-        (otherTeam.ladder || "mens") === teamLadder &&
-        Array.isArray(otherTeam.memberEmails) &&
-        otherTeam.memberEmails.some(function(existingEmail){
-          return String(existingEmail).toLowerCase() === email;
-        })
-      );
-    });
-  });
-
-  if(duplicateEmail){
-    const assignedTeam = teams.find(function(otherTeam){
-      return (
-        otherTeam !== team &&
-        (otherTeam.ladder || "mens") === teamLadder &&
-        Array.isArray(otherTeam.memberEmails) &&
-        otherTeam.memberEmails.some(function(existingEmail){
-          return String(existingEmail).toLowerCase() === duplicateEmail;
-        })
-      );
-    });
-
-    alert(
-      duplicateEmail +
-      " is already assigned to " +
-      assignedTeam.name +
-      " in this ladder."
-    );
-    return;
+  if(await callSecureFunction(
+    "admin_assign_team_members_secure",
+    {
+      requested_team_id: team.id,
+      requested_email_one: emails[0] || null,
+      requested_email_two: emails[1] || null
+    },
+    "Saving player emails"
+  )){
+    alert("Player emails saved for " + team.name + ".");
+    renderBoard();
   }
-
-  team.memberEmails = [...new Set(emails)];
-}
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
-  }
-
-  alert("Player emails saved for " + team.name + ".");
-
-  renderBoard();
 }
 function eligibleChallengeIndexes(team){
   if(!team || isTeamAway(team)){
@@ -916,27 +904,6 @@ async function adminRemoveTeam(index){
     return;
   }
 
-  const openChallenge = pendingChallenges.find(function(item){
-    return (
-      [
-        "Pending",
-        "Accepted",
-        "Awaiting Confirmation",
-        "Decline Pending Admin Review",
-        "Overdue",
-        "Disputed"
-      ].includes(item.status) &&
-      (item.challenger === team || item.challenged === team)
-    );
-  });
-
-  if(openChallenge){
-    alert(
-      "This team has an open challenge. Close the challenge before removing the team."
-    );
-    return;
-  }
-
   if(
     !confirm(
       "Remove " + team.name +
@@ -946,36 +913,16 @@ async function adminRemoveTeam(index){
     return;
   }
 
-  const previousRanks = captureTeamRanks();
-
-  teams.splice(index, 1);
-
-  createdTeams = createdTeams.filter(function(createdTeam){
-    return createdTeam !== team;
-  });
-
-  recordLadderMovements(
-    previousRanks,
-    "Team removed by Admin"
-  );
-
-  if(myTeam === team){
-    myTeam = null;
+  if(await callSecureFunction(
+    "admin_remove_team_secure",
+    { requested_team_id: team.id },
+    "Removing team"
+  )){
+    alert(team.name + " was removed.");
+    renderBoard();
   }
-
-  if(historyTeam === team){
-    historyTeam = null;
-  }
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
-    return;
-  }
-
-  renderBoard();
 }
+  
   
 async function adminAddTeam(){
   if(!isAdmin()){
@@ -994,15 +941,6 @@ async function adminAddTeam(){
   );
 
   if(teamName === null || teamName.trim() === ""){
-    return;
-  }
-
-  const duplicateName = teams.some(function(team){
-    return team.name.toLowerCase() === teamName.trim().toLowerCase();
-  });
-
-  if(duplicateName){
-    alert("That team name is already being used.");
     return;
   }
 
@@ -1028,60 +966,48 @@ async function adminAddTeam(){
 
   const firstIsNR =
     playerOneDupr.trim().toUpperCase() === "NR";
-
   const secondIsNR =
     playerTwoDupr.trim().toUpperCase() === "NR";
-
   const teamIsNR = firstIsNR || secondIsNR;
+  const firstDupr = Number(playerOneDupr);
+  const secondDupr = Number(playerTwoDupr);
 
   if(
     !teamIsNR &&
     (
-      isNaN(parseFloat(playerOneDupr)) ||
-      isNaN(parseFloat(playerTwoDupr))
+      !Number.isFinite(firstDupr) ||
+      !Number.isFinite(secondDupr) ||
+      firstDupr <= 0 ||
+      secondDupr <= 0
     )
   ){
-    alert("Please enter a valid DUPR or NR for each player.");
+    alert("Please enter a valid positive DUPR or NR for each player.");
     return;
   }
 
   const combinedDupr = teamIsNR
-    ? "NR"
-    : (
-        parseFloat(playerOneDupr) +
-        parseFloat(playerTwoDupr)
-      ).toFixed(2);
+    ? null
+    : Number((firstDupr + secondDupr).toFixed(2));
 
-  const newTeam = {
-    name: teamName.trim(),
-    players: playerOne.trim() + " / " + playerTwo.trim(),
-    ladder: currentLadder,
-    dupr: combinedDupr,
-    isNR: teamIsNR,
-    wins: 0,
-    losses: 0,
-    memberUserIds: [],
-    memberEmails: []
-  };
-
-  createdTeams.push(newTeam);
-  placeNewTeamByDupr();
-  myTeam = newTeam;
-
-  const saved = await saveLadderState();
-
-  if(!saved){
-    await loadLadderState();
-    return;
+  if(await callSecureFunction(
+    "admin_add_team_secure",
+    {
+      requested_ladder: currentLadder,
+      requested_team_name: teamName.trim(),
+      requested_players: playerOne.trim() + " / " + playerTwo.trim(),
+      requested_dupr: combinedDupr,
+      requested_is_nr: teamIsNR
+    },
+    "Adding team"
+  )){
+    alert(
+      teamName.trim() + " was added to the " +
+      ladderNames[currentLadder] + "."
+    );
+    renderBoard();
   }
-
-  alert(
-    newTeam.name + " was added to the " +
-    ladderNames[currentLadder] + "."
-  );
-
-  renderBoard();
 }
+  
   
 function renderBoard(){
   const c = document.getElementById("content");
@@ -1141,6 +1067,14 @@ function renderBoard(){
     assignmentHtml +
     "<p><b>Which team are you?</b></p>" +
     "<select onchange='selectTeam(this.value)'>" + options + "</select>";
+
+if(isAdmin()){
+  html +=
+    "<br><br><button class='smallBtn' onclick='adminAddTeam()'>" +
+      "➕ Add Team to This Ladder" +
+    "</button>";
+}
+
   const myIndex = myTeam ? ladderTeams.indexOf(myTeam) : -1;
 if(myIndex >= 0){
   const noticeIndexes = eligibleChallengeIndexes(myTeam);
@@ -1263,6 +1197,16 @@ if(teamAway){
     html +=
       "<br><button class='smallBtn' onclick='setTeamAway("+i+")'>Mark Away</button>";
   }
+}
+
+if(mine && isAdmin()){
+  html +=
+    "<br><button class='smallBtn' onclick='assignTeamMembers(" +
+      i +
+    ")'>Assign Player Emails</button> " +
+    "<button class='declineBtn smallBtn' onclick='adminRemoveTeam(" +
+      i +
+    ")'>Remove Team</button>";
 }
     html+="</td></tr>";
   });
