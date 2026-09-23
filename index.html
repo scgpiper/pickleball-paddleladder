@@ -54,7 +54,8 @@ header p{margin:7px 0 0;color:#d6e6e3}
 }
 .sponsor-name{font-size:18px;font-weight:800;color:#d7ed3d}
 .sponsor-content{display:flex;align-items:center;justify-content:flex-end;gap:12px}
-.sponsor-logo{display:block;width:96px;height:96px;object-fit:contain;background:#fff;border-radius:12px;padding:5px;box-sizing:border-box}
+.sponsor-logo-frame{display:block;width:112px;height:112px;flex:0 0 112px;overflow:hidden;background:#fff;border-radius:14px}
+.sponsor-logo{display:block;width:100%;height:100%;object-fit:contain;transform:scale(2.1)}
 
 main{
   max-width:1000px;
@@ -176,7 +177,7 @@ select{
   .sponsor{padding-left:12px}
   .sponsor-name{font-size:13px}
   .sponsor-label{font-size:9px}
-  .sponsor-logo{width:64px;height:64px;padding:3px}
+  .sponsor-logo-frame{width:72px;height:72px;flex-basis:72px}
   .sponsor-content{gap:7px}
   main{padding:16px 12px 32px}
   .grid{grid-template-columns:1fr 1fr;gap:9px}
@@ -203,7 +204,7 @@ select{
       <span class="sponsor-label">Presented by</span>
       <div class="sponsor-content">
         <span class="sponsor-name">Pickleball Patrol</span>
-        <img class="sponsor-logo" src="Pickleball.jpg" alt="Pickleball Patrol logo" width="96" height="96">
+        <span class="sponsor-logo-frame"><img class="sponsor-logo" src="Pickleball.jpg" alt="Pickleball Patrol logo" width="112" height="112"></span>
       </div>
     </div>
   </div>
