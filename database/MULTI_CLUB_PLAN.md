@@ -28,7 +28,9 @@ Resolve `?club=<slug>` from `clubs`, defaulting to VPA for preexisting links. Di
 
 ## Registration rule
 
-A team is registered only in the club whose page created it. A person can join a separate team at another club using the same email and Supabase sign-in. Club membership and team membership must be keyed by club context, so the same email is not treated as a duplicate across clubs. Merely changing the club URL does not move a team, grant club administration, or authorize a challenge. Existing VPA membership is backfilled from VPA rosters.
+A team is registered only in the club whose page created it. A person can join a separate team at another club using the same email and Supabase sign-in. Club membership and team membership must be keyed by club context, so the same email is not treated as a duplicate across clubs. Merely changing the club URL does not move a team, grant club administration, or authorize a challenge. Existing VPA membership is backfilled from VPA rosters. A new applicant requests access to a club and receives no membership until that club's administrator approves it. A regional ladder is a separately managed group whose administrator approves applications from players at multiple clubs. Club leaderboards are private by default; an administrator may explicitly publish a limited standings view without exposing member emails or private records. The same user may have approved memberships in several groups and choose one after signing in.
+
+The stage 03 helper previously inserted active membership on self-join. That behavior would bypass club approval; the draft now disables that entry point. `08_club_join_approval_DRAFT.sql` sketches a request queue and checked review functions. It assumes the described schema and must be reviewed against the live database before any execution. Registration screens and public standings are not implemented in this branch.
 
 ## Migration order
 
