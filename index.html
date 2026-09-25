@@ -419,6 +419,16 @@ async function signOutUser(){
   currentUser = null;
   currentUserIsAdmin = false;
   myTeam = null;
+  historyTeam = null;
+  challenge = null;
+  teams = [];
+  pendingChallenges = [];
+  challengeHistory = [];
+  matchHistory = [];
+  ladderMovementHistory = [];
+  partnerListings = [];
+  partnerInvites = [];
+  await loadLadderState();
   renderBoard();
 }
 
@@ -641,19 +651,7 @@ async function saveLadderState(){
   return false;
 }
 
-let teams = [
-  {name:"Baseline Bandits",players:"Adams / Brown",dupr:9.10,wins:8,losses:1},
-  {name:"Kitchen Kings",players:"Carter / Davis",dupr:8.95,wins:7,losses:2},
-  {name:"Third Shot Crew",players:"Evans / Foster",dupr:8.72,wins:6,losses:2},
-  {name:"Dink Dynasty",players:"Green / Harris",dupr:8.55,wins:6,losses:3},
-  {name:"Paddle Pressure",players:"Owens / Parker",dupr:7.91,wins:5,losses:4},
-  {name:"Court Commanders",players:"Irwin / Jones",dupr:8.38,wins:5,losses:4},
-  {name:"Side Out",players:"King / Lewis",dupr:8.20,wins:5,losses:4},
-  {name:"No Man's Land",players:"Martin / Nelson",dupr:8.05,wins:4,losses:3},
-  {name:"Court Rush",players:"Wilson / Young",dupr:7.51,wins:3,losses:3},
-  {name:"Drop Shots",players:"Quinn / Roberts",dupr:7.80,wins:3,losses:4},
-  {name:"The Challengers",players:"Underwood / Vance",dupr:7.56,wins:5,losses:2}
-];
+let teams = [];
  
   let matchHistory=[];
 let challengeHistory=[];
@@ -3306,7 +3304,11 @@ async function startApp(){
     });
   }
 
-  await loadLadderState();
+  if(!await loadLadderState()){
+    document.getElementById("content").textContent =
+      "Could not load the ladder. Refresh this page to try again.";
+    return;
+  }
 
 if(!currentUser){
   myTeam = null;
