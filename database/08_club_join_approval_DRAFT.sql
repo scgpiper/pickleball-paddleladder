@@ -1,8 +1,11 @@
 -- DRAFT ONLY. Do not run against production without inspecting existing
 -- clubs, club_memberships, roles, grants and policies, then testing in staging.
--- Assumes clubs(id, slug, active), club_memberships(club_id, user_id, role,
--- status) with unique (club_id, user_id), and the existing is_club_admin
--- and is_app_admin functions. This is not the complete multi-club rollout.
+-- Verified against read-only live schema inspection on 2026-09-24:
+-- clubs(id, name, slug, active), club_memberships(club_id, user_id, role,
+-- status) with unique (club_id, user_id); status is active/invited/inactive.
+-- Existing is_club_admin requires active admin/owner membership; is_app_admin
+-- checks private.app_admins. Verify grants, ownership and staging behavior
+-- separately. This is not the complete multi-club rollout.
 begin;
 
 create table if not exists public.club_join_requests (
@@ -60,6 +63,13 @@ begin
         reviewed_at = null,
         reviewed_by = null
     where club_join_requests.status = 'rejected';
+
+  select status into current_status
+  from public.club_join_requests
+  where club_id = selected_club_id and user_id = auth.uid();
+  if current_status <> 'pending' then
+    raise exception 'This request needs administrator review.';
+  end if;
 
   return 'pending';
 end;
