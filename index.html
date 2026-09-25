@@ -359,6 +359,8 @@ const PILOT_CLUB = Object.freeze({
   club_name: "PaddleLadder Club Pilot",
   club_slug: "club-pilot"
 });
+// Enable after the reviewed approval RPCs are deployed and tested in staging.
+const ENABLE_CLUB_REQUESTS = false;
 let currentUser = null;
 let currentUserIsAdmin = false;
 let activeClub = PILOT_CLUB;
@@ -399,6 +401,14 @@ function renderClubChoice(){
     });
   }
 
+  if(ENABLE_CLUB_REQUESTS && !clubMembershipError){
+    const requestButton = document.createElement("button");
+    requestButton.className = "smallBtn";
+    requestButton.textContent = "Request access to a club";
+    requestButton.addEventListener("click", renderJoinRequests);
+    content.append(document.createElement("br"),requestButton);
+  }
+
   const signOut = document.createElement("button");
   signOut.className = "smallBtn";
   signOut.textContent = "Sign Out";
@@ -431,6 +441,13 @@ async function selectActiveClub(index){
     back.textContent = "Choose another club";
     back.addEventListener("click", renderClubChoice);
     content.append(heading,message,back);
+    if(ENABLE_CLUB_REQUESTS && canReviewClubRequests()){
+      const review = document.createElement("button");
+      review.className = "smallBtn";
+      review.textContent = "Review membership requests";
+      review.addEventListener("click", renderMembershipReview);
+      content.append(document.createTextNode(" "),review);
+    }
     return;
   }
 
@@ -443,6 +460,134 @@ async function selectActiveClub(index){
 
 function isAdmin(){
   return Boolean(currentUser && currentUserIsAdmin);
+}
+function canReviewClubRequests(){
+  return Boolean(currentUser && activeClub && (
+    currentUserIsAdmin || ["admin", "owner"].includes(activeClub.member_role)
+  ));
+}
+
+function addMembershipNavigation(content){
+  const back = document.createElement("button");
+  back.className = "smallBtn";
+  back.textContent = "Choose club";
+  back.addEventListener("click", renderClubChoice);
+  content.append(document.createElement("br"),back);
+}
+
+async function renderJoinRequests(){
+  if(!ENABLE_CLUB_REQUESTS || !currentUser) return;
+  document.querySelector("main .grid").style.display = "none";
+  const content = document.getElementById("content");
+  content.replaceChildren();
+  const heading = document.createElement("h2");
+  heading.textContent = "Request club access";
+  content.append(heading);
+
+  const [clubsResult, requestsResult] = await Promise.all([
+    dbClient.from("clubs").select("id,name,slug").eq("active",true).order("name"),
+    dbClient.rpc("my_ladder_club_requests_secure")
+  ]);
+  if(clubsResult.error || requestsResult.error){
+    const message = document.createElement("p");
+    message.textContent = "Could not load club registration. Please try again later.";
+    content.append(message);
+    addMembershipNavigation(content);
+    return;
+  }
+
+  const requests = requestsResult.data || [];
+  const clubs = clubsResult.data || [];
+  const list = document.createElement("div");
+  clubs.forEach(function(club){
+    const existing = requests.find(function(request){
+      return request.club_id === club.id;
+    });
+    const active = availableClubs.some(function(member){
+      return member.club_slug === club.slug;
+    });
+    const row = document.createElement("p");
+    row.append(document.createTextNode(club.name + " — "));
+    if(active){
+      row.append(document.createTextNode("Approved"));
+    }else if(existing && existing.status === "approved"){
+      row.append(document.createTextNode("Contact the club administrator to restore your access"));
+    }else if(existing && existing.status === "pending"){
+      row.append(document.createTextNode("Awaiting administrator approval"));
+    }else{
+      const button = document.createElement("button");
+      button.className = "smallBtn";
+      button.textContent = existing ? "Request again" : "Request access";
+      button.addEventListener("click",async function(){
+        button.disabled = true;
+        const result = await dbClient.rpc("request_ladder_club_secure",{
+          requested_slug: club.slug
+        });
+        if(result.error){
+          alert("Request failed: " + result.error.message);
+          button.disabled = false;
+          return;
+        }
+        await renderJoinRequests();
+      });
+      row.append(button);
+    }
+    list.append(row);
+  });
+  content.append(list);
+  addMembershipNavigation(content);
+}
+
+async function renderMembershipReview(){
+  if(!ENABLE_CLUB_REQUESTS || !canReviewClubRequests()) return;
+  document.querySelector("main .grid").style.display = "none";
+  const clubId = activeClub.club_id;
+  const content = document.getElementById("content");
+  content.replaceChildren();
+  const heading = document.createElement("h2");
+  heading.textContent = "Membership requests: " + activeClub.club_name;
+  content.append(heading);
+  const result = await dbClient.rpc("pending_ladder_club_requests_secure",{
+    requested_club_id: clubId
+  });
+  if(result.error){
+    const message = document.createElement("p");
+    message.textContent = "Could not load membership requests. Please try again later.";
+    content.append(message);
+    addMembershipNavigation(content);
+    return;
+  }
+  const requests = result.data || [];
+  if(!requests.length){
+    const message = document.createElement("p");
+    message.textContent = "No membership requests are waiting for review.";
+    content.append(message);
+  }
+  requests.forEach(function(request){
+    const row = document.createElement("p");
+    row.append(document.createTextNode(request.applicant_email + " "));
+    [true,false].forEach(function(approve){
+      const button = document.createElement("button");
+      button.className = "smallBtn";
+      button.textContent = approve ? "Approve" : "Reject";
+      button.addEventListener("click",async function(){
+        button.disabled = true;
+        const review = await dbClient.rpc("review_ladder_club_request_secure",{
+          requested_request_id: request.request_id,
+          requested_approve: approve
+        });
+        if(review.error){
+          alert("Review failed: " + review.error.message);
+          button.disabled = false;
+          return;
+        }
+        await renderMembershipReview();
+      });
+      row.append(button,document.createTextNode(" "));
+    });
+    content.append(row);
+  });
+  addMembershipNavigation(content);
 }
 async function loadCurrentUser(){
   const { data, error } = await dbClient.auth.getSession();
@@ -1356,6 +1501,12 @@ function renderBoard(){
         "<b>Signed in:</b> " + currentUser.email + "<br><br>" +
         (availableClubs.length > 1
           ? "<button class='smallBtn' onclick='renderClubChoice()'>Choose Club</button> "
+          : "") +
+        (ENABLE_CLUB_REQUESTS
+          ? "<button class='smallBtn' onclick='renderJoinRequests()'>Request Club Access</button> "
+          : "") +
+        (ENABLE_CLUB_REQUESTS && canReviewClubRequests()
+          ? "<button class='smallBtn' onclick='renderMembershipReview()'>Membership Requests</button> "
           : "") +
         "<button class='smallBtn' onclick='signOutUser()'>Sign Out</button>" +
       "</div>"
