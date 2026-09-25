@@ -354,8 +354,15 @@ const dbClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
 );
+const PILOT_CLUB = Object.freeze({
+  club_id: "b42c8151-c62a-44d1-9571-0448eeca3021",
+  club_name: "PaddleLadder Club Pilot",
+  club_slug: "club-pilot"
+});
 let currentUser = null;
 let currentUserIsAdmin = false;
+let activeClub = PILOT_CLUB;
+let availableClubs = [];
 
 function isAdmin(){
   return Boolean(currentUser && currentUserIsAdmin);
@@ -372,18 +379,32 @@ async function loadCurrentUser(){
 
   if(!currentUser){
     currentUserIsAdmin = false;
+    availableClubs = [];
+    activeClub = PILOT_CLUB;
     return;
   }
 
-  const adminCheck = await dbClient.rpc("is_app_admin");
+  const [adminCheck, clubCheck] = await Promise.all([
+    dbClient.rpc("is_app_admin"),
+    dbClient.rpc("get_my_active_clubs_secure")
+  ]);
 
   if(adminCheck.error){
     console.error("Could not check administrator access:", adminCheck.error);
     currentUserIsAdmin = false;
+  }else{
+    currentUserIsAdmin = adminCheck.data === true;
+  }
+
+  if(clubCheck.error){
+    console.error("Could not load club membership:", clubCheck.error);
+    availableClubs = [];
+    activeClub = null;
     return;
   }
 
-  currentUserIsAdmin = adminCheck.data === true;
+  availableClubs = clubCheck.data || [];
+  activeClub = availableClubs.length === 1 ? availableClubs[0] : null;
 }
 
 async function signInWithEmail(){
@@ -418,7 +439,11 @@ async function signOutUser(){
 
   currentUser = null;
   currentUserIsAdmin = false;
+  availableClubs = [];
+  activeClub = PILOT_CLUB;
   myTeam = null;
+  document.querySelector("main .grid").style.display = "";
+  await loadLadderState();
   renderBoard();
 }
 
@@ -435,6 +460,10 @@ function showDatabaseError(action,error){
 }
 
 async function callSecureFunction(functionName,args,actionLabel){
+  if(!activeClub || !activeClub.club_id){
+    alert("Select an active club before continuing.");
+    return false;
+  }
   const result = await dbClient.rpc(functionName,args || {});
 
   if(result.error){
@@ -447,16 +476,22 @@ async function callSecureFunction(functionName,args,actionLabel){
 }
 
 async function loadLadderState(){
+  if(!activeClub || !activeClub.club_id){
+    document.getElementById("content").textContent =
+      "No active club selected. Sign in with an active club membership.";
+    return false;
+  }
+  const clubId = activeClub.club_id;
   const selectedTeamId = myTeam ? myTeam.id : null;
   const historyTeamId = historyTeam ? historyTeam.id : null;
 
   const results = await Promise.all([
-    dbClient.from("ladder_teams").select("*").order("ladder").order("rank_position"),
-    dbClient.from("challenges").select("*").order("created_at", { ascending: false }),
-    dbClient.from("ladder_movements").select("*").order("created_at", { ascending: false }),
-    dbClient.from("partner_listings").select("*").eq("status", "Active").order("created_at", { ascending: false }),
+    dbClient.from("ladder_teams").select("*").eq("club_id", clubId).order("ladder").order("rank_position"),
+    dbClient.from("challenges").select("*").eq("club_id", clubId).order("created_at", { ascending: false }),
+    dbClient.from("ladder_movements").select("*").eq("club_id", clubId).order("created_at", { ascending: false }),
+    dbClient.from("partner_listings").select("*").eq("club_id", clubId).eq("status", "Active").order("created_at", { ascending: false }),
     currentUser
-      ? dbClient.from("partner_invites").select("*").order("created_at", { ascending: false })
+      ? dbClient.from("partner_invites").select("*").eq("club_id", clubId).order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null }),
     currentUser && isAdmin()
       ? dbClient.rpc("admin_get_team_members_secure")
@@ -3200,7 +3235,7 @@ async function cancelPartnerInvite(index){
 }
   
 
-const LOBBY_CONFIG = Object.freeze({ clubName:"VPA", rotationMs:12000, refreshMs:60000 });
+const LOBBY_CONFIG = Object.freeze({ clubName:"VPA", clubId:PILOT_CLUB.club_id, rotationMs:12000, refreshMs:60000 });
 const LOBBY_LADDERS = [
   { key:"mens", title:"Men's Ladder" },
   { key:"womens", title:"Women's Ladder" },
@@ -3262,6 +3297,7 @@ function renderLobby(){
 async function refreshLobby(){
   const result = await dbClient.from("ladder_teams")
     .select("ladder,rank_position,name,players,dupr,is_nr,wins,losses")
+    .eq("club_id", LOBBY_CONFIG.clubId)
     .order("rank_position");
   if(result.error){
     console.error("Could not refresh lobby standings:",result.error);
@@ -3292,6 +3328,21 @@ function startLobbyScreen(){
 
 async function startApp(){
   await loadCurrentUser();
+
+  if(currentUser && !activeClub){
+    document.querySelector("main .grid").style.display = "none";
+    const content = document.getElementById("content");
+    if(availableClubs.length > 1){
+      content.textContent = "Your account belongs to multiple clubs. Club selection will be available after club-aware team creation is ready.";
+    }else{
+      content.textContent = "Your account has no active club membership. Ask your club administrator for access.";
+    }
+    const signOut = document.createElement("button");
+    signOut.textContent = "Sign Out";
+    signOut.addEventListener("click", signOutUser);
+    content.append(document.createElement("br"),signOut);
+    return;
+  }
 
   if(currentUser){
     const refreshResults = await Promise.all([
