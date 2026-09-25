@@ -363,6 +363,83 @@ let currentUser = null;
 let currentUserIsAdmin = false;
 let activeClub = PILOT_CLUB;
 let availableClubs = [];
+let clubMembershipError = false;
+
+function isPilotClub(club){
+  return Boolean(club && club.club_id === PILOT_CLUB.club_id);
+}
+
+function renderClubChoice(){
+  document.querySelector("main .grid").style.display = "none";
+  const content = document.getElementById("content");
+  content.replaceChildren();
+  const heading = document.createElement("h2");
+  heading.textContent = "Choose your club";
+  content.append(heading);
+
+  if(clubMembershipError){
+    const message = document.createElement("p");
+    message.textContent = "Could not check your club memberships. Refresh this page and try again.";
+    content.append(message);
+  }else if(!availableClubs.length){
+    const message = document.createElement("p");
+    message.textContent = "Your account has no active club membership. Ask a club administrator for access.";
+    content.append(message);
+  }else{
+    const message = document.createElement("p");
+    message.textContent = "Select the club whose ladder you want to use.";
+    content.append(message);
+    availableClubs.forEach(function(club,index){
+      const button = document.createElement("button");
+      button.className = "smallBtn";
+      button.textContent = club.club_name || "Club " + (index + 1);
+      button.style.margin = "0 8px 8px 0";
+      button.addEventListener("click", function(){ selectActiveClub(index); });
+      content.append(button);
+    });
+  }
+
+  const signOut = document.createElement("button");
+  signOut.className = "smallBtn";
+  signOut.textContent = "Sign Out";
+  signOut.addEventListener("click", signOutUser);
+  content.append(document.createElement("br"),signOut);
+}
+
+async function selectActiveClub(index){
+  if(!Number.isInteger(index) || !availableClubs[index]) return;
+  activeClub = availableClubs[index];
+  myTeam = null;
+  historyTeam = null;
+  challenge = null;
+  teams = [];
+  pendingChallenges = [];
+  partnerListings = [];
+  partnerInvites = [];
+
+  // Other clubs need verified RLS, club-aware writes, and approval before use.
+  if(!isPilotClub(activeClub)){
+    document.querySelector("main .grid").style.display = "none";
+    const content = document.getElementById("content");
+    content.replaceChildren();
+    const heading = document.createElement("h2");
+    heading.textContent = activeClub.club_name || "Selected club";
+    const message = document.createElement("p");
+    message.textContent = "This club's ladder is not available yet. Club access and approval are still being set up.";
+    const back = document.createElement("button");
+    back.className = "smallBtn";
+    back.textContent = "Choose another club";
+    back.addEventListener("click", renderClubChoice);
+    content.append(heading,message,back);
+    return;
+  }
+
+  document.querySelector("main .grid").style.display = "";
+  if(await loadLadderState()){
+    if(!isAdmin()) myTeam = findCurrentUsersTeam();
+    show("board");
+  }
+}
 
 function isAdmin(){
   return Boolean(currentUser && currentUserIsAdmin);
@@ -380,6 +457,7 @@ async function loadCurrentUser(){
   if(!currentUser){
     currentUserIsAdmin = false;
     availableClubs = [];
+    clubMembershipError = false;
     activeClub = PILOT_CLUB;
     return;
   }
@@ -399,11 +477,13 @@ async function loadCurrentUser(){
   if(clubCheck.error){
     console.error("Could not load club membership:", clubCheck.error);
     availableClubs = [];
+    clubMembershipError = true;
     activeClub = null;
     return;
   }
 
   availableClubs = clubCheck.data || [];
+  clubMembershipError = false;
   activeClub = availableClubs.length === 1 ? availableClubs[0] : null;
 }
 
@@ -440,6 +520,7 @@ async function signOutUser(){
   currentUser = null;
   currentUserIsAdmin = false;
   availableClubs = [];
+  clubMembershipError = false;
   activeClub = PILOT_CLUB;
   myTeam = null;
   document.querySelector("main .grid").style.display = "";
@@ -464,6 +545,10 @@ async function callSecureFunction(functionName,args,actionLabel){
     alert("Select an active club before continuing.");
     return false;
   }
+  if(!isPilotClub(activeClub)){
+    alert("This club's ladder is not available yet.");
+    return false;
+  }
   const result = await dbClient.rpc(functionName,args || {});
 
   if(result.error){
@@ -479,6 +564,10 @@ async function loadLadderState(){
   if(!activeClub || !activeClub.club_id){
     document.getElementById("content").textContent =
       "No active club selected. Sign in with an active club membership.";
+    return false;
+  }
+  if(!isPilotClub(activeClub)){
+    console.error("Club data is unavailable until database isolation is verified.");
     return false;
   }
   const clubId = activeClub.club_id;
@@ -1265,6 +1354,9 @@ function renderBoard(){
   const authHtml = currentUser
     ? "<div class='success'>" +
         "<b>Signed in:</b> " + currentUser.email + "<br><br>" +
+        (availableClubs.length > 1
+          ? "<button class='smallBtn' onclick='renderClubChoice()'>Choose Club</button> "
+          : "") +
         "<button class='smallBtn' onclick='signOutUser()'>Sign Out</button>" +
       "</div>"
     : "<div class='warning'>" +
@@ -3330,17 +3422,12 @@ async function startApp(){
   await loadCurrentUser();
 
   if(currentUser && !activeClub){
-    document.querySelector("main .grid").style.display = "none";
-    const content = document.getElementById("content");
-    if(availableClubs.length > 1){
-      content.textContent = "Your account belongs to multiple clubs. Club selection will be available after club-aware team creation is ready.";
-    }else{
-      content.textContent = "Your account has no active club membership. Ask your club administrator for access.";
-    }
-    const signOut = document.createElement("button");
-    signOut.textContent = "Sign Out";
-    signOut.addEventListener("click", signOutUser);
-    content.append(document.createElement("br"),signOut);
+    renderClubChoice();
+    return;
+  }
+
+  if(currentUser && !isPilotClub(activeClub)){
+    await selectActiveClub(0);
     return;
   }
 
