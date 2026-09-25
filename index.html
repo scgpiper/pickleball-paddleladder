@@ -189,6 +189,12 @@ th,td{
 .notice{background:#e8f4f5}
 .success{background:#eaf8ee}
 .warning{background:#fff3cd}
+.auth-form{display:grid;gap:10px;max-width:430px;margin-top:12px}
+.auth-form label{display:grid;gap:5px;font-weight:700}
+.auth-form input{width:100%}
+.auth-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.auth-actions button{font-size:14px;padding:10px 12px}
+.auth-status{min-height:1.3em;margin:8px 0 0}
 
 select,
 input{
@@ -356,6 +362,7 @@ const dbClient = window.supabase.createClient(
 );
 let currentUser = null;
 let currentUserIsAdmin = false;
+let authFormMode = "signIn";
 
 function isAdmin(){
   return Boolean(currentUser && currentUserIsAdmin);
@@ -387,7 +394,8 @@ async function loadCurrentUser(){
 }
 
 async function signInWithEmail(){
-  const email = prompt("Enter your email address:");
+  const email = document.getElementById("authEmail")?.value ||
+    prompt("Enter your email address:");
 
   if(email === null || email.trim() === ""){
     return;
@@ -406,6 +414,102 @@ async function signInWithEmail(){
   }
 
   alert("Check your email and click the PaddleLadder sign-in link.");
+}
+
+function setAuthFormMode(mode){
+  authFormMode = mode === "signUp" ? "signUp" : "signIn";
+  renderBoard();
+}
+
+async function submitPasswordAuth(event){
+  event.preventDefault();
+  const form = event.currentTarget;
+  const email = form.elements.email.value.trim();
+  const password = form.elements.password.value;
+  const message = document.getElementById("authMessage");
+
+  if(authFormMode === "signUp" && password !== form.elements.confirmPassword.value){
+    message.textContent = "The passwords do not match.";
+    return;
+  }
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  message.textContent = "Please wait…";
+
+  try{
+    const result = authFormMode === "signUp"
+      ? await dbClient.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin }
+        })
+      : await dbClient.auth.signInWithPassword({ email, password });
+
+    if(result.error){
+      message.textContent = result.error.message;
+      return;
+    }
+
+    if(result.data?.session){
+      await startApp();
+      return;
+    }
+
+    message.textContent = "Check your email to confirm your account, then sign in.";
+    form.elements.password.value = "";
+    if(form.elements.confirmPassword) form.elements.confirmPassword.value = "";
+  }catch(error){
+    console.error("Authentication failed:",error);
+    message.textContent = "Could not connect. Please try again.";
+  }finally{
+    submitButton.disabled = false;
+  }
+}
+
+async function resetPassword(){
+  const emailField = document.getElementById("authEmail");
+  const message = document.getElementById("authMessage");
+  const email = emailField.value.trim();
+  if(!email){
+    message.textContent = "Enter your email address first.";
+    emailField.focus();
+    return;
+  }
+  try{
+    const { error } = await dbClient.auth.resetPasswordForEmail(email,{
+      redirectTo: window.location.origin
+    });
+    message.textContent = error
+      ? "Could not send a reset email: " + error.message
+      : "If this account exists, check your email for a password reset link.";
+  }catch(error){
+    console.error("Password reset failed:",error);
+    message.textContent = "Could not send a reset email. Please try again.";
+  }
+}
+
+async function setAccountPassword(event){
+  event.preventDefault();
+  const form = event.currentTarget;
+  const message = document.getElementById("passwordMessage");
+  const password = form.elements.newPassword.value;
+  if(password !== form.elements.confirmPassword.value){
+    message.textContent = "The passwords do not match.";
+    return;
+  }
+  const submitButton = form.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  try{
+    const { error } = await dbClient.auth.updateUser({ password });
+    message.textContent = error ? error.message : "Password saved. Use it the next time you sign in.";
+    if(!error) form.reset();
+  }catch(error){
+    console.error("Password update failed:",error);
+    message.textContent = "Could not save your password. Please try again.";
+  }finally{
+    submitButton.disabled = false;
+  }
 }
 
 async function signOutUser(){
@@ -1229,10 +1333,31 @@ function renderBoard(){
     ? "<div class='success'>" +
         "<b>Signed in:</b> " + currentUser.email + "<br><br>" +
         "<button class='smallBtn' onclick='signOutUser()'>Sign Out</button>" +
+        "<details><summary>Set or change your password</summary>" +
+          "<form class='auth-form' onsubmit='setAccountPassword(event)'>" +
+            "<label>New password<input name='newPassword' type='password' minlength='8' autocomplete='new-password' required></label>" +
+            "<label>Confirm password<input name='confirmPassword' type='password' minlength='8' autocomplete='new-password' required></label>" +
+            "<button type='submit'>Save password</button><p id='passwordMessage' class='auth-status' role='status'></p>" +
+          "</form></details>" +
       "</div>"
     : "<div class='warning'>" +
-        "<b>You are viewing the public ladder.</b><br><br>" +
-        "<button class='smallBtn' onclick='signInWithEmail()'>Sign In by Email</button>" +
+        "<b>You are viewing the public ladder.</b>" +
+        "<p>" + (authFormMode === "signUp" ? "Create an account" : "Sign in") + " with your email and password.</p>" +
+        "<form class='auth-form' onsubmit='submitPasswordAuth(event)'>" +
+          "<label>Email<input id='authEmail' name='email' type='email' autocomplete='email' required></label>" +
+          "<label>Password<input name='password' type='password' minlength='8' autocomplete='" +
+            (authFormMode === "signUp" ? "new-password" : "current-password") + "' required></label>" +
+          (authFormMode === "signUp"
+            ? "<label>Confirm password<input name='confirmPassword' type='password' minlength='8' autocomplete='new-password' required></label>"
+            : "") +
+          "<button type='submit'>" + (authFormMode === "signUp" ? "Create account" : "Sign in") + "</button>" +
+        "</form>" +
+        "<div class='auth-actions'>" +
+          "<button type='button' onclick='setAuthFormMode(\"" + (authFormMode === "signUp" ? "signIn" : "signUp") + "\")'>" +
+            (authFormMode === "signUp" ? "Already have an account? Sign in" : "Create account") + "</button>" +
+          "<button type='button' onclick='signInWithEmail()'>Use an email link instead</button>" +
+          "<button type='button' onclick='resetPassword()'>Forgot password?</button>" +
+        "</div><p id='authMessage' class='auth-status' role='status'></p>" +
       "</div>";
 
   const assignmentHtml =
