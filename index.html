@@ -442,6 +442,7 @@ async function signOutUser(){
   availableClubs = [];
   activeClub = PILOT_CLUB;
   myTeam = null;
+  document.querySelector("main .grid").style.display = "";
   await loadLadderState();
   renderBoard();
 }
