@@ -363,6 +363,9 @@ const dbClient = window.supabase.createClient(
 let currentUser = null;
 let currentUserIsAdmin = false;
 let authFormMode = "signIn";
+// Turn on only after the pilot team-registration SQL is installed and tested.
+const ENABLE_PILOT_TEAM_REGISTRATION = false;
+let teamRegistrationRequests = [];
 
 function isAdmin(){
   return Boolean(currentUser && currentUserIsAdmin);
@@ -532,6 +535,7 @@ async function signOutUser(){
   ladderMovementHistory = [];
   partnerListings = [];
   partnerInvites = [];
+  teamRegistrationRequests = [];
   await loadLadderState();
   renderBoard();
 }
@@ -556,8 +560,7 @@ async function callSecureFunction(functionName,args,actionLabel){
     return false;
   }
 
-  await loadLadderState();
-  return true;
+  return await loadLadderState();
 }
 
 async function loadLadderState(){
@@ -574,6 +577,9 @@ async function loadLadderState(){
       : Promise.resolve({ data: [], error: null }),
     currentUser && isAdmin()
       ? dbClient.rpc("admin_get_team_members_secure")
+      : Promise.resolve({ data: [], error: null }),
+    currentUser && ENABLE_PILOT_TEAM_REGISTRATION
+      ? dbClient.rpc("my_pilot_team_requests_secure")
       : Promise.resolve({ data: [], error: null })
   ]);
 
@@ -585,6 +591,8 @@ async function loadLadderState(){
     showDatabaseError("Loading ladder information",failedResult.error);
     return false;
   }
+
+  teamRegistrationRequests = results[6].data || [];
 
   teams = (results[0].data || []).map(function(row){
     return {
@@ -1298,6 +1306,98 @@ async function adminAddTeam(){
     renderBoard();
   }
 }
+
+function escapeHtml(value){
+  return String(value == null ? "" : value).replace(/[&<>"']/g,function(character){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character];
+  });
+}
+
+function renderPilotTeamRegistration(){
+  if(!ENABLE_PILOT_TEAM_REGISTRATION || !currentUser || isAdmin()) return "";
+
+  const pending = teamRegistrationRequests.filter(function(request){
+    return request.ladder === currentLadder && request.status === "pending";
+  });
+  const outgoing = pending.find(function(request){ return request.am_captain; });
+  let html = "<section class='notice'><h3>Join the ladder with a partner</h3>";
+
+  pending.forEach(function(request){
+    const name = escapeHtml(request.team_name);
+    const captain = escapeHtml(request.captain_name);
+    const partner = escapeHtml(request.partner_name);
+    const id = String(request.id);
+    if(request.am_captain){
+      html += "<p><b>Waiting for " + partner + "</b> to accept your team " + name +
+        ". Ask them to sign in with " + escapeHtml(request.partner_email) +
+        ". <button class='smallBtn' onclick='cancelPilotTeamRequest(\"" + id + "\")'>Cancel request</button></p>";
+    }else{
+      html += "<p><b>" + captain + "</b> invited you to join <b>" + name + "</b>." +
+        " <button class='smallBtn' onclick='respondPilotTeamRequest(\"" + id + "\",true)'>Accept</button>" +
+        " <button class='smallBtn' onclick='respondPilotTeamRequest(\"" + id + "\",false)'>Decline</button></p>";
+    }
+  });
+
+  if(!findCurrentUsersTeam() && !outgoing){
+    html += "<p>Create a two-player team. Your partner must sign in and accept before it appears on the ladder.</p>" +
+      "<form class='auth-form' onsubmit='requestPilotTeam(event)'>" +
+        "<label>Team name<input name='teamName' maxlength='80' minlength='2' required></label>" +
+        "<label>Your name<input name='captainName' maxlength='80' minlength='2' required></label>" +
+        "<label>Your DUPR (leave blank for NR)<input name='captainDupr' type='number' min='0.01' max='10' step='0.01'></label>" +
+        "<label>Partner's name<input name='partnerName' maxlength='80' minlength='2' required></label>" +
+        "<label>Partner's email<input name='partnerEmail' type='email' required></label>" +
+        "<label>Partner's DUPR (leave blank for NR)<input name='partnerDupr' type='number' min='0.01' max='10' step='0.01'></label>" +
+        "<button type='submit'>Ask partner to join</button>" +
+      "</form><p>Your partner will see the invitation here after signing in. They will not receive an automatic email from this form.</p>";
+  }
+
+  return html + "</section>";
+}
+
+async function requestPilotTeam(event){
+  event.preventDefault();
+  if(!ENABLE_PILOT_TEAM_REGISTRATION || !currentUser) return;
+  const form = event.currentTarget;
+  const captainDupr = form.elements.captainDupr.value;
+  const partnerDupr = form.elements.partnerDupr.value;
+  const button = form.querySelector('button[type="submit"]');
+  button.disabled = true;
+  try{
+    if(await callSecureFunction("request_pilot_team_secure",{
+      requested_ladder: currentLadder,
+      requested_team_name: form.elements.teamName.value.trim(),
+      requested_captain_name: form.elements.captainName.value.trim(),
+      requested_captain_dupr: captainDupr ? Number(captainDupr) : null,
+      requested_captain_is_nr: !captainDupr,
+      requested_partner_name: form.elements.partnerName.value.trim(),
+      requested_partner_email: form.elements.partnerEmail.value.trim(),
+      requested_partner_dupr: partnerDupr ? Number(partnerDupr) : null,
+      requested_partner_is_nr: !partnerDupr
+    },"Requesting a team")){
+      alert("Team request saved. Ask your partner to sign in and accept it.");
+      renderBoard();
+    }
+  }finally{
+    button.disabled = false;
+  }
+}
+
+async function respondPilotTeamRequest(id,accept){
+  if(!ENABLE_PILOT_TEAM_REGISTRATION || !currentUser) return;
+  if(await callSecureFunction("respond_pilot_team_request_secure",{
+    requested_request_id: id, requested_accept: accept
+  },accept ? "Accepting team" : "Declining team")){
+    if(accept) myTeam = findCurrentUsersTeam();
+    renderBoard();
+  }
+}
+
+async function cancelPilotTeamRequest(id){
+  if(!ENABLE_PILOT_TEAM_REGISTRATION || !currentUser) return;
+  if(await callSecureFunction("cancel_pilot_team_request_secure",{
+    requested_request_id: id
+  },"Cancelling team request")) renderBoard();
+}
   
   
 function renderBoard(){
@@ -1364,7 +1464,9 @@ function renderBoard(){
     currentUser &&
     !isAdmin() &&
     !findCurrentUsersTeam()
-      ? "<div class='warning'><b>Your account has not been assigned to a team in this ladder yet.</b><br>Please contact the ladder administrator.</div>"
+      ? (ENABLE_PILOT_TEAM_REGISTRATION
+        ? "<div class='warning'>You are not on a team in this ladder yet. Create a team below or accept an invitation.</div>"
+        : "<div class='warning'><b>Your account has not been assigned to a team in this ladder yet.</b><br>Please contact the ladder administrator.</div>")
       : "";
 
   let html =
@@ -1377,6 +1479,7 @@ function renderBoard(){
       "<option value='mixed' " + (currentLadder === "mixed" ? "selected" : "") + ">Mixed Ladder</option>" +
     "</select>" +
     assignmentHtml +
+    renderPilotTeamRegistration() +
     "<p><b>Which team are you?</b></p>" +
     "<select onchange='selectTeam(this.value)'>" + options + "</select>";
 
