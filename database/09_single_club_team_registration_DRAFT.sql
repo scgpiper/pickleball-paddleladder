@@ -299,11 +299,12 @@ begin
   where id = r.id;
 
   -- Other outstanding invitations involving either player can no longer be accepted.
-  update private.team_registration_requests
+  update private.team_registration_requests as pending
   set status = 'declined', decided_at = now()
-  where id <> r.id and club_id = r.club_id and ladder = r.ladder and status = 'pending'
-    and (captain_id in (r.captain_id, auth.uid())
-         or partner_email in (r.captain_email, r.partner_email));
+  where pending.id <> r.id and pending.club_id = r.club_id
+    and pending.ladder = r.ladder and pending.status = 'pending'
+    and (pending.captain_id in (r.captain_id, auth.uid())
+         or pending.partner_email in (r.captain_email, r.partner_email));
 
   return new_team_id;
 end;
