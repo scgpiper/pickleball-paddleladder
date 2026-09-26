@@ -17,6 +17,18 @@ Each player can have at most one active team per ladder, enforced by unique rost
 5. Check whether the current team rows are examples or real pilot data. Back up and replace example rows only with the club's approval. Do not delete live rows as part of a code deployment.
 6. Verify the old production URL and VPA lobby after merging any pilot fixes. Keep the multi-club draft PRs out of this release.
 
+## Isolated database setup
+
+Run these SQL files in **PaddleLadder Pilot Test only**, in this order, one at a time. They are still drafts until the test run and review succeed.
+
+1. `database/13_pilot_test_baseline_DRAFT.sql` creates the 20 app tables with constraints, indexes and RLS, without copying player data. The legacy `leaderboard_view` is not part of the current pilot client and is omitted.
+2. `database/14_pilot_test_routines_DRAFT.sql` installs the app RPCs, read policies and triggers. Direct browser table writes are withheld.
+3. `database/15_pilot_test_club_seed_DRAFT.sql` inserts exactly one invented club.
+4. `database/09_single_club_team_registration_DRAFT.sql` adds open club enrollment and partner-confirmed team registration.
+5. `database/16_pilot_test_setup_check_READONLY.sql` checks the isolated setup.
+
+Do not enable the UI flag or use the Vercel PR preview until the preview's Supabase URL and publishable key point to the test project. The current preview code still points at the original project.
+
 ## This code change
 
 The browser no longer supplies a hardcoded sample leaderboard when a database load fails. After sign-out, it clears signed-in team and invitation state and reloads the public board. The draft adds password account creation, sign-in, reset and password setting for existing email-link accounts, retaining email-link sign-in as a fallback. It also contains a disabled team-request UI and an unapplied single-club SQL migration. No live database rows are altered by this PR. Keep the PR in draft until the database and email checks above pass. Do not enable team requests in production before installing and verifying the migration.
