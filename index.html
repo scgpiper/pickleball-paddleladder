@@ -297,6 +297,7 @@ body.lobby-mode > header,body.lobby-mode > main{display:none}
 </head>
 
 <body>
+<div style="background:#7d3100;color:#fff;text-align:center;padding:10px 16px;font-weight:800;letter-spacing:.03em">PILOT TEST PREVIEW · Fictional club and test data only</div>
 <header>
   <div class="court-art" aria-hidden="true"><span class="court-center"></span></div>
   <div class="header-inner">
@@ -331,7 +332,7 @@ body.lobby-mode > header,body.lobby-mode > main{display:none}
     </div>
   </div>
   <div class="lobby-foot">
-    <div><strong>Want to play?</strong> Visit <span class="lobby-url">pickleball-paddleladder.vercel.app</span></div>
+    <div><strong>Pilot test preview</strong> · Fictional club and test data only</div>
     <div class="lobby-dots" aria-label="Men's, Women's, and Mixed ladders"><span class="lobby-dot active"></span><span class="lobby-dot"></span><span class="lobby-dot"></span></div>
   </div>
 </section>
@@ -354,8 +355,8 @@ body.lobby-mode > header,body.lobby-mode > main{display:none}
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SUPABASE_URL = "https://lnxqaqxrtxtkiiikaqhg.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_hsbU7OslX93sjImve7QdAg_ZIbOC8oE";
+const SUPABASE_URL = "https://xcozpadxvpjkgoflhjgr.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_IKoj6tm9zIDe5F5-h39-_g_s1AgxA_j";
 const dbClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
@@ -364,7 +365,7 @@ let currentUser = null;
 let currentUserIsAdmin = false;
 let authFormMode = "signIn";
 // Turn on only after the pilot team-registration SQL is installed and tested.
-const ENABLE_PILOT_TEAM_REGISTRATION = false;
+const ENABLE_PILOT_TEAM_REGISTRATION = true;
 let teamRegistrationRequests = [];
 
 function isAdmin(){
