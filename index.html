@@ -1431,7 +1431,7 @@ function renderBoard(){
 
   const authHtml = currentUser
     ? "<div class='success'>" +
-        "<b>Signed in:</b> " + currentUser.email + "<br><br>" +
+        "<b>Signed in:</b> " + escapeHtml(currentUser.email) + "<br><br>" +
         "<button class='smallBtn' onclick='signOutUser()'>Sign Out</button>" +
         "<details><summary>Set or change your password</summary>" +
           "<form class='auth-form' onsubmit='setAccountPassword(event)'>" +

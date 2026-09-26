@@ -77,6 +77,10 @@ begin
      or pg_catalog.length(team_name) not between 2 and 80
      or pg_catalog.length(captain_name) not between 2 and 80
      or pg_catalog.length(partner_name) not between 2 and 80
+     -- The existing board inserts names into HTML; allow plain names only.
+     or team_name !~ '^[[:alnum:]][[:alnum:] .''-]*$'
+     or captain_name !~ '^[[:alnum:]][[:alnum:] .''-]*$'
+     or partner_name !~ '^[[:alnum:]][[:alnum:] .''-]*$'
      or partner_email !~ '^[^[:space:]@]+@[^[:space:]@]+[.][^[:space:]@]+$'
      or partner_email = caller_email then
     raise exception 'Check the ladder, names, and partner email';
