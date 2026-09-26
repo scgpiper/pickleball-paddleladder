@@ -3519,6 +3519,16 @@ function startLobbyScreen(){
 async function startApp(){
   await loadCurrentUser();
 
+  if(currentUser && !isAdmin() && ENABLE_PILOT_TEAM_REGISTRATION){
+    const enrollment = await dbClient.rpc("join_pilot_club_secure");
+    if(enrollment.error){
+      console.error("Could not join the pilot club:",enrollment.error);
+      document.getElementById("content").textContent =
+        "Could not join the pilot club: " + enrollment.error.message;
+      return;
+    }
+  }
+
   if(currentUser){
     const refreshResults = await Promise.all([
       dbClient.rpc("refresh_challenge_deadlines_secure"),
