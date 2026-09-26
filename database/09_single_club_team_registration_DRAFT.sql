@@ -39,6 +39,45 @@ create index if not exists team_registration_partner_pending
 
 revoke all on private.team_registration_requests from public, anon, authenticated;
 
+-- Open registration for the one active pilot club. Existing inactive memberships
+-- stay inactive; a previously removed account cannot reactivate itself.
+create or replace function public.join_pilot_club_secure()
+returns uuid language plpgsql security definer set search_path to ''
+as $function$
+declare
+  active_club_ids uuid[];
+  pilot_club_id uuid;
+begin
+  if auth.uid() is null or not exists (
+    select 1 from auth.users
+    where id = auth.uid() and email_confirmed_at is not null
+  ) then
+    raise exception 'Confirm your email address before joining the club';
+  end if;
+
+  select pg_catalog.array_agg(id) into active_club_ids
+  from public.clubs where active = true;
+  if pg_catalog.cardinality(active_club_ids) is distinct from 1 then
+    raise exception 'Pilot registration requires exactly one active club';
+  end if;
+  pilot_club_id := active_club_ids[1];
+
+  insert into public.club_memberships (club_id, user_id, role, status)
+  values (pilot_club_id, auth.uid(), 'member', 'active')
+  on conflict (club_id, user_id) do nothing;
+
+  if not exists (
+    select 1 from public.club_memberships
+    where club_id = pilot_club_id and user_id = auth.uid()
+      and status = 'active'
+  ) then
+    raise exception 'This club membership is inactive';
+  end if;
+
+  return pilot_club_id;
+end;
+$function$;
+
 create or replace function public.request_pilot_team_secure(
   requested_ladder text,
   requested_team_name text,
@@ -79,6 +118,7 @@ begin
     raise exception 'Pilot team registration requires exactly one active club';
   end if;
   pilot_club_id := active_club_ids[1];
+  perform public.join_pilot_club_secure();
 
   if target_ladder not in ('mens', 'womens', 'mixed')
      or pg_catalog.length(team_name) not between 2 and 80
@@ -199,6 +239,7 @@ begin
      or active_club_ids[1] is distinct from r.club_id then
     raise exception 'Pilot team registration requires the one active club';
   end if;
+  perform public.join_pilot_club_secure();
 
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('pilot-roster:' || r.club_id || ':' || r.ladder));
 
@@ -279,10 +320,12 @@ begin
 end;
 $function$;
 
+revoke all on function public.join_pilot_club_secure() from public, anon;
 revoke all on function public.request_pilot_team_secure(text,text,text,numeric,boolean,text,numeric,boolean,text) from public, anon;
 revoke all on function public.my_pilot_team_requests_secure() from public, anon;
 revoke all on function public.respond_pilot_team_request_secure(uuid,boolean) from public, anon;
 revoke all on function public.cancel_pilot_team_request_secure(uuid) from public, anon;
+grant execute on function public.join_pilot_club_secure() to authenticated;
 grant execute on function public.request_pilot_team_secure(text,text,text,numeric,boolean,text,numeric,boolean,text) to authenticated;
 grant execute on function public.my_pilot_team_requests_secure() to authenticated;
 grant execute on function public.respond_pilot_team_request_secure(uuid,boolean) to authenticated;
