@@ -6,6 +6,7 @@ begin;
 
 create table if not exists private.team_registration_requests (
   id uuid primary key default gen_random_uuid(),
+  club_id uuid not null references public.clubs(id) on delete restrict,
   ladder text not null check (ladder in ('mens', 'womens', 'mixed')),
   team_name text not null,
   captain_id uuid not null references auth.users(id) on delete cascade,
@@ -25,7 +26,7 @@ create table if not exists private.team_registration_requests (
 );
 
 create unique index if not exists team_registration_one_pending_per_captain
-  on private.team_registration_requests (ladder, captain_id)
+  on private.team_registration_requests (club_id, ladder, captain_id)
   where status = 'pending';
 
 create index if not exists team_registration_partner_pending
@@ -53,6 +54,8 @@ language plpgsql security definer set search_path to ''
 as $function$
 declare
   caller_email text;
+  active_club_ids uuid[];
+  pilot_club_id uuid;
   target_ladder text := lower(pg_catalog.btrim(coalesce(requested_ladder, '')));
   team_name text := pg_catalog.btrim(coalesce(requested_team_name, ''));
   captain_name text := pg_catalog.btrim(coalesce(requested_captain_name, ''));
@@ -69,6 +72,13 @@ begin
   if caller_email is null then
     raise exception 'Confirm your email address before creating a team';
   end if;
+
+  select pg_catalog.array_agg(id) into active_club_ids
+  from public.clubs where active = true;
+  if pg_catalog.cardinality(active_club_ids) is distinct from 1 then
+    raise exception 'Pilot team registration requires exactly one active club';
+  end if;
+  pilot_club_id := active_club_ids[1];
 
   if target_ladder not in ('mens', 'womens', 'mixed')
      or pg_catalog.length(team_name) not between 2 and 80
@@ -90,11 +100,11 @@ begin
     raise exception 'Enter each player''s DUPR or mark them NR';
   end if;
 
-  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('pilot-roster:' || target_ladder));
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('pilot-roster:' || pilot_club_id || ':' || target_ladder));
 
   if exists (
     select 1 from private.team_members m
-    where m.ladder = target_ladder
+    where m.club_id = pilot_club_id and m.ladder = target_ladder
       and (m.user_id = auth.uid() or lower(m.email) in (caller_email, partner_email))
   ) then
     raise exception 'One of these players is already on a team in this ladder';
@@ -102,17 +112,18 @@ begin
 
   if exists (
     select 1 from public.ladder_teams t
-    where t.ladder = target_ladder and lower(t.name) = lower(team_name)
+    where t.club_id = pilot_club_id and t.ladder = target_ladder
+      and lower(t.name) = lower(team_name)
   ) then
     raise exception 'That team name is already used in this ladder';
   end if;
 
   insert into private.team_registration_requests (
-    ladder, team_name, captain_id, captain_email, captain_name,
+    club_id, ladder, team_name, captain_id, captain_email, captain_name,
     captain_dupr, captain_is_nr, partner_email, partner_name,
     partner_dupr, partner_is_nr
   ) values (
-    target_ladder, team_name, auth.uid(), caller_email, captain_name,
+    pilot_club_id, target_ladder, team_name, auth.uid(), caller_email, captain_name,
     case when coalesce(requested_captain_is_nr, false) then null else requested_captain_dupr end,
     coalesce(requested_captain_is_nr, false), partner_email, partner_name,
     case when coalesce(requested_partner_is_nr, false) then null else requested_partner_dupr end,
@@ -150,6 +161,7 @@ as $function$
 declare
   r private.team_registration_requests%rowtype;
   partner_email text;
+  active_club_ids uuid[];
   new_team_id uuid;
   target_rank integer;
   combined_dupr numeric;
@@ -181,11 +193,18 @@ begin
     return null;
   end if;
 
-  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('pilot-roster:' || r.ladder));
+  select pg_catalog.array_agg(id) into active_club_ids
+  from public.clubs where active = true;
+  if pg_catalog.cardinality(active_club_ids) is distinct from 1
+     or active_club_ids[1] is distinct from r.club_id then
+    raise exception 'Pilot team registration requires the one active club';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('pilot-roster:' || r.club_id || ':' || r.ladder));
 
   if exists (
     select 1 from private.team_members m
-    where m.ladder = r.ladder
+    where m.club_id = r.club_id and m.ladder = r.ladder
       and (m.user_id in (r.captain_id, auth.uid())
            or lower(m.email) in (r.captain_email, r.partner_email))
   ) then
@@ -194,7 +213,8 @@ begin
 
   if exists (
     select 1 from public.ladder_teams t
-    where t.ladder = r.ladder and lower(t.name) = lower(r.team_name)
+    where t.club_id = r.club_id and t.ladder = r.ladder
+      and lower(t.name) = lower(r.team_name)
   ) then
     raise exception 'That team name is already used in this ladder';
   end if;
@@ -203,33 +223,33 @@ begin
   combined_dupr := case when team_is_nr then null
     else pg_catalog.round(r.captain_dupr + r.partner_dupr, 2) end;
 
-  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('ladder:pilot:' || r.ladder));
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('ladder:pilot:' || r.club_id || ':' || r.ladder));
 
   if not team_is_nr then
     select t.rank_position into target_rank
     from public.ladder_teams t
-    where t.ladder = r.ladder and t.rank_position >= 11
+    where t.club_id = r.club_id and t.ladder = r.ladder and t.rank_position >= 11
       and (t.is_nr = true or t.dupr is null or t.dupr < combined_dupr)
     order by t.rank_position limit 1;
   end if;
 
   if target_rank is null then
     select coalesce(max(t.rank_position), 0) + 1 into target_rank
-    from public.ladder_teams t where t.ladder = r.ladder;
+    from public.ladder_teams t where t.club_id = r.club_id and t.ladder = r.ladder;
   end if;
 
   update public.ladder_teams
   set rank_position = rank_position + 1, updated_at = now()
-  where ladder = r.ladder and rank_position >= target_rank;
+  where club_id = r.club_id and ladder = r.ladder and rank_position >= target_rank;
 
-  insert into public.ladder_teams (ladder, rank_position, name, players, dupr, is_nr)
-  values (r.ladder, target_rank, r.team_name,
+  insert into public.ladder_teams (club_id, ladder, rank_position, name, players, dupr, is_nr)
+  values (r.club_id, r.ladder, target_rank, r.team_name,
           r.captain_name || ' / ' || r.partner_name, combined_dupr, team_is_nr)
   returning id into new_team_id;
 
-  insert into private.team_members (team_id, ladder, user_id, email)
-  values (new_team_id, r.ladder, r.captain_id, r.captain_email),
-         (new_team_id, r.ladder, auth.uid(), r.partner_email);
+  insert into private.team_members (club_id, team_id, ladder, user_id, email)
+  values (r.club_id, new_team_id, r.ladder, r.captain_id, r.captain_email),
+         (r.club_id, new_team_id, r.ladder, auth.uid(), r.partner_email);
 
   update private.team_registration_requests
   set status = 'accepted', decided_at = now(), created_team_id = new_team_id
@@ -238,7 +258,7 @@ begin
   -- Other outstanding invitations involving either player can no longer be accepted.
   update private.team_registration_requests
   set status = 'declined', decided_at = now()
-  where id <> r.id and ladder = r.ladder and status = 'pending'
+  where id <> r.id and club_id = r.club_id and ladder = r.ladder and status = 'pending'
     and (captain_id in (r.captain_id, auth.uid())
          or partner_email in (r.captain_email, r.partner_email));
 
