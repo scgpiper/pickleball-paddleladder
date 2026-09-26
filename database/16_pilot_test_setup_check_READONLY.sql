@@ -10,6 +10,8 @@ union all
 select 'app functions', count(*)::text, '43 (38 baseline + 5 registration)'
 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 where n.nspname in ('public','private')
+  -- Supabase's automatic-RLS helper is present only in the new test project.
+  and not (n.nspname = 'public' and p.proname = 'rls_auto_enable')
   and not exists (
     select 1 from pg_depend d
     where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e'
