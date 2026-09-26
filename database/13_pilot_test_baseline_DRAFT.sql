@@ -1,6 +1,8 @@
 -- DRAFT. Run only in the isolated PaddleLadder Pilot Test project.
 -- Generated from the September 25 production metadata inventory; no production rows are copied.
 -- This builds table shapes, keys, checks and indexes. RPCs, policies, grants, and test data follow separately.
+-- The legacy leaderboard_view was a view in the source inventory and is not used by the pilot client/RPCs;
+-- its columns must not be recreated as a table.
 -- Do not run against the original Pickleball PaddleLadder project.
 begin;
 create schema if not exists private;
@@ -149,25 +151,6 @@ create table public.ladders (
   upper_division_min numeric not null default 7.000,
   upper_division_max numeric not null default 11.000,
   created_at timestamp with time zone not null default now()
-);
-
-create table public.leaderboard_view (
-  ladder_id uuid,
-  ladder_name text,
-  ladder_code text,
-  team_id uuid,
-  rank integer,
-  team_name text,
-  player_1 text,
-  player_2 text,
-  player_1_dupr numeric,
-  player_2_dupr numeric,
-  current_combined_dupr numeric,
-  entry_combined_dupr numeric,
-  wins integer,
-  losses integer,
-  matches_played integer,
-  status text
 );
 
 create table public.legacy_challenges (
