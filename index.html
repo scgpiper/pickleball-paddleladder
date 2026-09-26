@@ -189,6 +189,12 @@ th,td{
 .notice{background:#e8f4f5}
 .success{background:#eaf8ee}
 .warning{background:#fff3cd}
+.auth-form{display:grid;gap:10px;max-width:430px;margin-top:12px}
+.auth-form label{display:grid;gap:5px;font-weight:700}
+.auth-form input{width:100%}
+.auth-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.auth-actions button{font-size:14px;padding:10px 12px}
+.auth-status{min-height:1.3em;margin:8px 0 0}
 
 select,
 input{
@@ -356,6 +362,10 @@ const dbClient = window.supabase.createClient(
 );
 let currentUser = null;
 let currentUserIsAdmin = false;
+let authFormMode = "signIn";
+// Turn on only after the pilot team-registration SQL is installed and tested.
+const ENABLE_PILOT_TEAM_REGISTRATION = false;
+let teamRegistrationRequests = [];
 
 function isAdmin(){
   return Boolean(currentUser && currentUserIsAdmin);
@@ -387,7 +397,8 @@ async function loadCurrentUser(){
 }
 
 async function signInWithEmail(){
-  const email = prompt("Enter your email address:");
+  const email = document.getElementById("authEmail")?.value ||
+    prompt("Enter your email address:");
 
   if(email === null || email.trim() === ""){
     return;
@@ -408,6 +419,102 @@ async function signInWithEmail(){
   alert("Check your email and click the PaddleLadder sign-in link.");
 }
 
+function setAuthFormMode(mode){
+  authFormMode = mode === "signUp" ? "signUp" : "signIn";
+  renderBoard();
+}
+
+async function submitPasswordAuth(event){
+  event.preventDefault();
+  const form = event.currentTarget;
+  const email = form.elements.email.value.trim();
+  const password = form.elements.password.value;
+  const message = document.getElementById("authMessage");
+
+  if(authFormMode === "signUp" && password !== form.elements.confirmPassword.value){
+    message.textContent = "The passwords do not match.";
+    return;
+  }
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  message.textContent = "Please wait…";
+
+  try{
+    const result = authFormMode === "signUp"
+      ? await dbClient.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.origin }
+        })
+      : await dbClient.auth.signInWithPassword({ email, password });
+
+    if(result.error){
+      message.textContent = result.error.message;
+      return;
+    }
+
+    if(result.data?.session){
+      await startApp();
+      return;
+    }
+
+    message.textContent = "Check your email to confirm your account, then sign in.";
+    form.elements.password.value = "";
+    if(form.elements.confirmPassword) form.elements.confirmPassword.value = "";
+  }catch(error){
+    console.error("Authentication failed:",error);
+    message.textContent = "Could not connect. Please try again.";
+  }finally{
+    submitButton.disabled = false;
+  }
+}
+
+async function resetPassword(){
+  const emailField = document.getElementById("authEmail");
+  const message = document.getElementById("authMessage");
+  const email = emailField.value.trim();
+  if(!email){
+    message.textContent = "Enter your email address first.";
+    emailField.focus();
+    return;
+  }
+  try{
+    const { error } = await dbClient.auth.resetPasswordForEmail(email,{
+      redirectTo: window.location.origin
+    });
+    message.textContent = error
+      ? "Could not send a reset email: " + error.message
+      : "If this account exists, check your email for a password reset link.";
+  }catch(error){
+    console.error("Password reset failed:",error);
+    message.textContent = "Could not send a reset email. Please try again.";
+  }
+}
+
+async function setAccountPassword(event){
+  event.preventDefault();
+  const form = event.currentTarget;
+  const message = document.getElementById("passwordMessage");
+  const password = form.elements.newPassword.value;
+  if(password !== form.elements.confirmPassword.value){
+    message.textContent = "The passwords do not match.";
+    return;
+  }
+  const submitButton = form.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  try{
+    const { error } = await dbClient.auth.updateUser({ password });
+    message.textContent = error ? error.message : "Password saved. Use it the next time you sign in.";
+    if(!error) form.reset();
+  }catch(error){
+    console.error("Password update failed:",error);
+    message.textContent = "Could not save your password. Please try again.";
+  }finally{
+    submitButton.disabled = false;
+  }
+}
+
 async function signOutUser(){
   const { error } = await dbClient.auth.signOut();
 
@@ -419,6 +526,17 @@ async function signOutUser(){
   currentUser = null;
   currentUserIsAdmin = false;
   myTeam = null;
+  historyTeam = null;
+  challenge = null;
+  teams = [];
+  pendingChallenges = [];
+  challengeHistory = [];
+  matchHistory = [];
+  ladderMovementHistory = [];
+  partnerListings = [];
+  partnerInvites = [];
+  teamRegistrationRequests = [];
+  await loadLadderState();
   renderBoard();
 }
 
@@ -442,8 +560,7 @@ async function callSecureFunction(functionName,args,actionLabel){
     return false;
   }
 
-  await loadLadderState();
-  return true;
+  return await loadLadderState();
 }
 
 async function loadLadderState(){
@@ -460,6 +577,9 @@ async function loadLadderState(){
       : Promise.resolve({ data: [], error: null }),
     currentUser && isAdmin()
       ? dbClient.rpc("admin_get_team_members_secure")
+      : Promise.resolve({ data: [], error: null }),
+    currentUser && ENABLE_PILOT_TEAM_REGISTRATION
+      ? dbClient.rpc("my_pilot_team_requests_secure")
       : Promise.resolve({ data: [], error: null })
   ]);
 
@@ -471,6 +591,8 @@ async function loadLadderState(){
     showDatabaseError("Loading ladder information",failedResult.error);
     return false;
   }
+
+  teamRegistrationRequests = results[6].data || [];
 
   teams = (results[0].data || []).map(function(row){
     return {
@@ -641,19 +763,7 @@ async function saveLadderState(){
   return false;
 }
 
-let teams = [
-  {name:"Baseline Bandits",players:"Adams / Brown",dupr:9.10,wins:8,losses:1},
-  {name:"Kitchen Kings",players:"Carter / Davis",dupr:8.95,wins:7,losses:2},
-  {name:"Third Shot Crew",players:"Evans / Foster",dupr:8.72,wins:6,losses:2},
-  {name:"Dink Dynasty",players:"Green / Harris",dupr:8.55,wins:6,losses:3},
-  {name:"Paddle Pressure",players:"Owens / Parker",dupr:7.91,wins:5,losses:4},
-  {name:"Court Commanders",players:"Irwin / Jones",dupr:8.38,wins:5,losses:4},
-  {name:"Side Out",players:"King / Lewis",dupr:8.20,wins:5,losses:4},
-  {name:"No Man's Land",players:"Martin / Nelson",dupr:8.05,wins:4,losses:3},
-  {name:"Court Rush",players:"Wilson / Young",dupr:7.51,wins:3,losses:3},
-  {name:"Drop Shots",players:"Quinn / Roberts",dupr:7.80,wins:3,losses:4},
-  {name:"The Challengers",players:"Underwood / Vance",dupr:7.56,wins:5,losses:2}
-];
+let teams = [];
  
   let matchHistory=[];
 let challengeHistory=[];
@@ -1196,6 +1306,98 @@ async function adminAddTeam(){
     renderBoard();
   }
 }
+
+function escapeHtml(value){
+  return String(value == null ? "" : value).replace(/[&<>"']/g,function(character){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character];
+  });
+}
+
+function renderPilotTeamRegistration(){
+  if(!ENABLE_PILOT_TEAM_REGISTRATION || !currentUser || isAdmin()) return "";
+
+  const pending = teamRegistrationRequests.filter(function(request){
+    return request.ladder === currentLadder && request.status === "pending";
+  });
+  const outgoing = pending.find(function(request){ return request.am_captain; });
+  let html = "<section class='notice'><h3>Join the ladder with a partner</h3>";
+
+  pending.forEach(function(request){
+    const name = escapeHtml(request.team_name);
+    const captain = escapeHtml(request.captain_name);
+    const partner = escapeHtml(request.partner_name);
+    const id = String(request.id);
+    if(request.am_captain){
+      html += "<p><b>Waiting for " + partner + "</b> to accept your team " + name +
+        ". Ask them to sign in with " + escapeHtml(request.partner_email) +
+        ". <button class='smallBtn' onclick='cancelPilotTeamRequest(\"" + id + "\")'>Cancel request</button></p>";
+    }else{
+      html += "<p><b>" + captain + "</b> invited you to join <b>" + name + "</b>." +
+        " <button class='smallBtn' onclick='respondPilotTeamRequest(\"" + id + "\",true)'>Accept</button>" +
+        " <button class='smallBtn' onclick='respondPilotTeamRequest(\"" + id + "\",false)'>Decline</button></p>";
+    }
+  });
+
+  if(!findCurrentUsersTeam() && !outgoing){
+    html += "<p>Create a two-player team. Your partner must sign in and accept before it appears on the ladder.</p>" +
+      "<form class='auth-form' onsubmit='requestPilotTeam(event)'>" +
+        "<label>Team name<input name='teamName' maxlength='80' minlength='2' required></label>" +
+        "<label>Your name<input name='captainName' maxlength='80' minlength='2' required></label>" +
+        "<label>Your DUPR (leave blank for NR)<input name='captainDupr' type='number' min='0.01' max='10' step='0.01'></label>" +
+        "<label>Partner's name<input name='partnerName' maxlength='80' minlength='2' required></label>" +
+        "<label>Partner's email<input name='partnerEmail' type='email' required></label>" +
+        "<label>Partner's DUPR (leave blank for NR)<input name='partnerDupr' type='number' min='0.01' max='10' step='0.01'></label>" +
+        "<button type='submit'>Ask partner to join</button>" +
+      "</form><p>Your partner will see the invitation here after signing in. They will not receive an automatic email from this form.</p>";
+  }
+
+  return html + "</section>";
+}
+
+async function requestPilotTeam(event){
+  event.preventDefault();
+  if(!ENABLE_PILOT_TEAM_REGISTRATION || !currentUser) return;
+  const form = event.currentTarget;
+  const captainDupr = form.elements.captainDupr.value;
+  const partnerDupr = form.elements.partnerDupr.value;
+  const button = form.querySelector('button[type="submit"]');
+  button.disabled = true;
+  try{
+    if(await callSecureFunction("request_pilot_team_secure",{
+      requested_ladder: currentLadder,
+      requested_team_name: form.elements.teamName.value.trim(),
+      requested_captain_name: form.elements.captainName.value.trim(),
+      requested_captain_dupr: captainDupr ? Number(captainDupr) : null,
+      requested_captain_is_nr: !captainDupr,
+      requested_partner_name: form.elements.partnerName.value.trim(),
+      requested_partner_email: form.elements.partnerEmail.value.trim(),
+      requested_partner_dupr: partnerDupr ? Number(partnerDupr) : null,
+      requested_partner_is_nr: !partnerDupr
+    },"Requesting a team")){
+      alert("Team request saved. Ask your partner to sign in and accept it.");
+      renderBoard();
+    }
+  }finally{
+    button.disabled = false;
+  }
+}
+
+async function respondPilotTeamRequest(id,accept){
+  if(!ENABLE_PILOT_TEAM_REGISTRATION || !currentUser) return;
+  if(await callSecureFunction("respond_pilot_team_request_secure",{
+    requested_request_id: id, requested_accept: accept
+  },accept ? "Accepting team" : "Declining team")){
+    if(accept) myTeam = findCurrentUsersTeam();
+    renderBoard();
+  }
+}
+
+async function cancelPilotTeamRequest(id){
+  if(!ENABLE_PILOT_TEAM_REGISTRATION || !currentUser) return;
+  if(await callSecureFunction("cancel_pilot_team_request_secure",{
+    requested_request_id: id
+  },"Cancelling team request")) renderBoard();
+}
   
   
 function renderBoard(){
@@ -1229,19 +1431,42 @@ function renderBoard(){
 
   const authHtml = currentUser
     ? "<div class='success'>" +
-        "<b>Signed in:</b> " + currentUser.email + "<br><br>" +
+        "<b>Signed in:</b> " + escapeHtml(currentUser.email) + "<br><br>" +
         "<button class='smallBtn' onclick='signOutUser()'>Sign Out</button>" +
+        "<details><summary>Set or change your password</summary>" +
+          "<form class='auth-form' onsubmit='setAccountPassword(event)'>" +
+            "<label>New password<input name='newPassword' type='password' minlength='8' autocomplete='new-password' required></label>" +
+            "<label>Confirm password<input name='confirmPassword' type='password' minlength='8' autocomplete='new-password' required></label>" +
+            "<button type='submit'>Save password</button><p id='passwordMessage' class='auth-status' role='status'></p>" +
+          "</form></details>" +
       "</div>"
     : "<div class='warning'>" +
-        "<b>You are viewing the public ladder.</b><br><br>" +
-        "<button class='smallBtn' onclick='signInWithEmail()'>Sign In by Email</button>" +
+        "<b>You are viewing the public ladder.</b>" +
+        "<p>" + (authFormMode === "signUp" ? "Create an account" : "Sign in") + " with your email and password.</p>" +
+        "<form class='auth-form' onsubmit='submitPasswordAuth(event)'>" +
+          "<label>Email<input id='authEmail' name='email' type='email' autocomplete='email' required></label>" +
+          "<label>Password<input name='password' type='password' minlength='8' autocomplete='" +
+            (authFormMode === "signUp" ? "new-password" : "current-password") + "' required></label>" +
+          (authFormMode === "signUp"
+            ? "<label>Confirm password<input name='confirmPassword' type='password' minlength='8' autocomplete='new-password' required></label>"
+            : "") +
+          "<button type='submit'>" + (authFormMode === "signUp" ? "Create account" : "Sign in") + "</button>" +
+        "</form>" +
+        "<div class='auth-actions'>" +
+          "<button type='button' onclick='setAuthFormMode(\"" + (authFormMode === "signUp" ? "signIn" : "signUp") + "\")'>" +
+            (authFormMode === "signUp" ? "Already have an account? Sign in" : "Create account") + "</button>" +
+          "<button type='button' onclick='signInWithEmail()'>Use an email link instead</button>" +
+          "<button type='button' onclick='resetPassword()'>Forgot password?</button>" +
+        "</div><p id='authMessage' class='auth-status' role='status'></p>" +
       "</div>";
 
   const assignmentHtml =
     currentUser &&
     !isAdmin() &&
     !findCurrentUsersTeam()
-      ? "<div class='warning'><b>Your account has not been assigned to a team in this ladder yet.</b><br>Please contact the ladder administrator.</div>"
+      ? (ENABLE_PILOT_TEAM_REGISTRATION
+        ? "<div class='warning'>You are not on a team in this ladder yet. Create a team below or accept an invitation.</div>"
+        : "<div class='warning'><b>Your account has not been assigned to a team in this ladder yet.</b><br>Please contact the ladder administrator.</div>")
       : "";
 
   let html =
@@ -1254,6 +1479,7 @@ function renderBoard(){
       "<option value='mixed' " + (currentLadder === "mixed" ? "selected" : "") + ">Mixed Ladder</option>" +
     "</select>" +
     assignmentHtml +
+    renderPilotTeamRegistration() +
     "<p><b>Which team are you?</b></p>" +
     "<select onchange='selectTeam(this.value)'>" + options + "</select>";
 
@@ -3293,6 +3519,16 @@ function startLobbyScreen(){
 async function startApp(){
   await loadCurrentUser();
 
+  if(currentUser && !isAdmin() && ENABLE_PILOT_TEAM_REGISTRATION){
+    const enrollment = await dbClient.rpc("join_pilot_club_secure");
+    if(enrollment.error){
+      console.error("Could not join the pilot club:",enrollment.error);
+      document.getElementById("content").textContent =
+        "Could not join the pilot club: " + enrollment.error.message;
+      return;
+    }
+  }
+
   if(currentUser){
     const refreshResults = await Promise.all([
       dbClient.rpc("refresh_challenge_deadlines_secure"),
@@ -3306,7 +3542,11 @@ async function startApp(){
     });
   }
 
-  await loadLadderState();
+  if(!await loadLadderState()){
+    document.getElementById("content").textContent =
+      "Could not load the ladder. Refresh this page to try again.";
+    return;
+  }
 
 if(!currentUser){
   myTeam = null;

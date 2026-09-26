@@ -1,0 +1,34 @@
+# One-club pilot release
+
+The first release uses the existing VPA ladder on `main`: Men's, Women's and Mixed doubles, team challenges, two-player team assignment, score confirmation, partner connect, history and admin review. Multi-club selection, regional ladders and four-player teams are later work. The app currently shows its leaderboard to signed-out visitors.
+
+## Pilot registration decision
+
+The club can send one announcement with the app link to its members. Members create their own accounts with email and password; there is no club directory upload or approval queue for each new account. The live app still relies on an admin to assign player emails to teams. The draft self-service flow automatically adds confirmed accounts as members of the one active pilot club, then lets one player request a team by supplying a partner's email; the partner signs in and accepts the request before the team appears. An inactive membership cannot reactivate itself. The form does not send the partner an invitation email, so the captain contacts them directly.
+
+Each player can have at most one active team per ladder, enforced by unique roster indexes against account ID and normalized email. The proposed flow checks again when the partner accepts. Because one person could use different email addresses, team rosters are visible and an admin must be able to correct reported duplicates. Email confirmation alone cannot guarantee one account per person. The designated captain rule belongs to the deferred four-player format; the two-player pilot currently allows either team member to act.
+
+## Before announcing to members
+
+1. Confirm the pilot club and agree which standings and history may be public. The existing page serves a public leaderboard.
+2. Check live Supabase table grants, RLS policies and every callable write function using separate signed-out, player and admin sessions. The client code does not grant permission; server rules must enforce it.
+3. Live read-only checks confirmed the expected columns, case-insensitive roster uniqueness, and zero duplicate emails/accounts. All 11 existing teams and the one roster entry have a matching `club_id`; there is one active club (September 25, 2026). The draft now requires exactly one active club and writes its ID to new teams and both roster entries. The full schema inventory also showed that existing challenge and partner RPCs require active club membership; the draft now enrolls confirmed accounts automatically so the open-registration flow can work. Build the isolated project from `database/13_pilot_test_baseline_DRAFT.sql` and `database/14_pilot_test_routines_DRAFT.sql` after reviewing them, then apply `database/09_single_club_team_registration_DRAFT.sql` there with invented players and a preview pointing only at that project. Set `ENABLE_PILOT_TEAM_REGISTRATION` to `true` in that test preview only. Test two non-admin accounts, pending invitation, acceptance, refusal, cancellation, attempted duplicate memberships and names, invalid name markup, simultaneous acceptance, roster visibility, and an admin correcting a duplicate. Then test password confirmation/sign-in/reset, existing email-link user setting a password, challenges, result confirmation, decline and overdue review, partner connect, and sign-out. Audit grants and RLS before any production migration.
+4. Verify a sending domain and configure custom SMTP for Supabase Auth before the club announces registration. Confirm email should remain enabled for sign-up. The built-in email sender's low quota blocked a second test account; password sign-in reduces repeat emails but confirmations and resets still send email.
+5. Check whether the current team rows are examples or real pilot data. Back up and replace example rows only with the club's approval. Do not delete live rows as part of a code deployment.
+6. Verify the old production URL and VPA lobby after merging any pilot fixes. Keep the multi-club draft PRs out of this release.
+
+## Isolated database setup
+
+Run these SQL files in **PaddleLadder Pilot Test only**, in this order, one at a time. They are still drafts until the test run and review succeed.
+
+1. `database/13_pilot_test_baseline_DRAFT.sql` creates the 20 app tables with constraints, indexes and RLS, without copying player data. The legacy `leaderboard_view` is not part of the current pilot client and is omitted.
+2. `database/14_pilot_test_routines_DRAFT.sql` installs the app RPCs, read policies and triggers. Direct browser table writes are withheld.
+3. `database/15_pilot_test_club_seed_DRAFT.sql` inserts exactly one invented club.
+4. `database/09_single_club_team_registration_DRAFT.sql` adds open club enrollment and partner-confirmed team registration.
+5. `database/16_pilot_test_setup_check_READONLY.sql` checks the isolated setup.
+
+Do not enable the UI flag or use the Vercel PR preview until the preview's Supabase URL and publishable key point to the test project. The current preview code still points at the original project.
+
+## This code change
+
+The browser no longer supplies a hardcoded sample leaderboard when a database load fails. After sign-out, it clears signed-in team and invitation state and reloads the public board. The draft adds password account creation, sign-in, reset and password setting for existing email-link accounts, retaining email-link sign-in as a fallback. It also contains a disabled team-request UI and an unapplied single-club SQL migration. No live database rows are altered by this PR. Keep the PR in draft until the database and email checks above pass. Do not enable team requests in production before installing and verifying the migration.
