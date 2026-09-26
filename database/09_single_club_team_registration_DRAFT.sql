@@ -25,6 +25,8 @@ create table if not exists private.team_registration_requests (
   decided_at timestamptz
 );
 
+alter table private.team_registration_requests enable row level security;
+
 create unique index if not exists team_registration_one_pending_per_captain
   on private.team_registration_requests (club_id, ladder, captain_id)
   where status = 'pending';
