@@ -32,12 +32,9 @@ create index if not exists team_registration_partner_pending
   on private.team_registration_requests (lower(partner_email), created_at)
   where status = 'pending';
 
--- Keep the rule in the database even if a different team-writing RPC is called.
--- An existing duplicate must be resolved before this migration can commit.
-create unique index if not exists pilot_team_member_email_ladder_unique
-  on private.team_members (ladder, lower(email));
-create unique index if not exists pilot_team_member_user_ladder_unique
-  on private.team_members (ladder, user_id) where user_id is not null;
+-- The live schema already enforces these rules with
+-- team_members_email_ladder_unique and team_members_user_ladder_unique.
+-- Confirm those indexes also exist in the isolated test project before applying.
 
 revoke all on private.team_registration_requests from public, anon, authenticated;
 
