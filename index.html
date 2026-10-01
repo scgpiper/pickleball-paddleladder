@@ -1320,7 +1320,7 @@ const challengeBusy = pendingChallenges.some(item =>
 );
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
 
-const rematchLocked = matchHistory.some(match => {
+const rematchLocked = !!myTeam && matchHistory.some(match => {
     const samePair =
         (match.teamA === myTeam.name && match.teamB === team.name) ||
         (match.teamA === team.name && match.teamB === myTeam.name);
