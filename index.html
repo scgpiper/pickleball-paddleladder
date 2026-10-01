@@ -357,6 +357,13 @@ const dbClient = window.supabase.createClient(
 let currentUser = null;
 let currentUserIsAdmin = false;
 
+function escapeHtml(value){
+  return String(value ?? "").replace(/[&<>"']/g, character => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;",
+    '"': "&quot;", "'": "&#39;"
+  })[character]);
+}
+
 function isAdmin(){
   return Boolean(currentUser && currentUserIsAdmin);
 }
@@ -1223,13 +1230,13 @@ function renderBoard(){
     options +=
       '<option value="' + mainIndex + '" ' +
       (team === myTeam ? "selected" : "") + ">" +
-      "#" + (ladderIndex + 1) + " — " + team.name +
+      "#" + (ladderIndex + 1) + " — " + escapeHtml(team.name) +
       "</option>";
   });
 
   const authHtml = currentUser
     ? "<div class='success'>" +
-        "<b>Signed in:</b> " + currentUser.email + "<br><br>" +
+        "<b>Signed in:</b> " + escapeHtml(currentUser.email) + "<br><br>" +
         "<button class='smallBtn' onclick='signOutUser()'>Sign Out</button>" +
       "</div>"
     : "<div class='warning'>" +
@@ -1271,7 +1278,7 @@ if(myIndex >= 0){
   if(isTeamAway(myTeam)){
     html +=
       "<div class='notice'><b>You are #" + (myIndex + 1) + " " +
-      myTeam.name + ".</b> Your team is currently Away and cannot issue or receive challenges.</div>";
+      escapeHtml(myTeam.name) + ".</b> Your team is currently Away and cannot issue or receive challenges.</div>";
 
   }else if(noticeIndexes.length){
     const availableRanks = noticeIndexes.map(function(mainIndex){
@@ -1281,7 +1288,7 @@ if(myIndex >= 0){
 
     html +=
       "<div class='notice'><b>You are #" + (myIndex + 1) + " " +
-      myTeam.name + ".</b> You may challenge the available teams at " +
+      escapeHtml(myTeam.name) + ".</b> You may challenge the available teams at " +
       availableRanks + ".</div>";
 
   }else{
@@ -1331,9 +1338,9 @@ const rematchLocked = !!myTeam && matchHistory.some(match => {
     html+=
    "<tr class='"+(ladderIndex<10?"top10 ":"")+(mine?"myteam":"")+"'>"+
   "<td><b>#"+(ladderIndex+1)+"</b></td>"+
-  "<td><b>"+team.name+"</b>"+
+  "<td><b>"+escapeHtml(team.name)+"</b>"+
     (teamAway ? "<div class='muted'>🏖️ Away</div>" : "")+
-    "<div class='muted'>"+team.players+"</div></td>"+
+    "<div class='muted'>"+escapeHtml(team.players)+"</div></td>"+
   "<td>"+(team.isNR ? "NR" : Number(team.dupr).toFixed(2))+"</td>"+
   "<td>"+team.wins+"-"+team.losses+"</td>"+
   "<td>";
@@ -1360,7 +1367,7 @@ if(teamAway){
 
   html +=
     "<span class='muted'>🔒 <b>Match in Progress</b><br>"+
-    "vs. "+opponent.name+"<br>"+
+    "vs. "+escapeHtml(opponent.name)+"<br>"+
     "Play by: "+playBy+"</span>";
 
 }else if(teamPendingChallenge){
@@ -1483,7 +1490,7 @@ function renderHistory(){
   const movementHtml = movementHistory.length
     ? movementHistory.map(function(item){
         return "<p><b>#" + item.fromRank + " → #" + item.toRank +
-          "</b><br>" + item.reason + "</p>";
+          "</b><br>" + escapeHtml(item.reason) + "</p>";
       }).join("")
     : "<p>No ladder movement recorded yet.</p>";
 
@@ -1492,15 +1499,15 @@ function renderHistory(){
 
     return "<option value='" + mainIndex + "' " +
       (team === selectedTeam ? "selected" : "") + ">" +
-      "#" + (index + 1) + " — " + team.name +
+      "#" + (index + 1) + " — " + escapeHtml(team.name) +
       "</option>";
   }).join("");
   const historyHtml = teamHistory.length
     ? teamHistory.map(function(item){
-        return "<p><b>" + item.challenger + "</b> → <b>" +
-          item.challenged + "</b><br>Status: " + item.status +
-          (item.declineReason ? "<br>Reason: " + item.declineReason : "") +
-          (item.cancelReason ? "<br>Reason: " + item.cancelReason : "") +
+        return "<p><b>" + escapeHtml(item.challenger) + "</b> → <b>" +
+          escapeHtml(item.challenged) + "</b><br>Status: " + escapeHtml(item.status) +
+          (item.declineReason ? "<br>Reason: " + escapeHtml(item.declineReason) : "") +
+          (item.cancelReason ? "<br>Reason: " + escapeHtml(item.cancelReason) : "") +
           "</p>";
       }).join("")
     : "<p>No challenge history yet.</p>";
@@ -1513,7 +1520,7 @@ function renderHistory(){
       "style='width:100%;padding:12px;font-size:16px;'>" +
       options +
     "</select>" +
-    "<h3>" + selectedTeam.name + "</h3>" +
+    "<h3>" + escapeHtml(selectedTeam.name) + "</h3>" +
     "<p><b>Current Rank:</b> #" + rank + "</p>" +
     "<p><b>Record:</b> " + selectedTeam.wins + "-" + selectedTeam.losses + "</p>" +
     "<p><b>Combined DUPR:</b> " + duprDisplay + "</p>" +
@@ -1548,7 +1555,7 @@ reviews.forEach((item,index)=>{
   if(item.status==="Overdue"){
     c.innerHTML+=
       "<div class='warning'>"+
-      "<b>"+item.challenger.name+" vs. "+item.challenged.name+"</b><br><br>"+
+      "<b>"+escapeHtml(item.challenger.name)+" vs. "+escapeHtml(item.challenged.name)+"</b><br><br>"+
       "<b>Reason:</b> Match was not completed within 7 days.<br><br>"+
      "<b>Status:</b> Overdue — waiting for admin review.<br><br>"+
 "<button class='acceptBtn smallBtn' onclick='extendOverdueMatch("+index+")'>Extend 7 Days</button> "+
@@ -1558,7 +1565,7 @@ reviews.forEach((item,index)=>{
 }else if(item.status==="Disputed"){
     c.innerHTML+=
       "<div class='warning'>"+
-      "<b>"+item.challenger.name+" vs. "+item.challenged.name+"</b><br><br>"+
+      "<b>"+escapeHtml(item.challenger.name)+" vs. "+escapeHtml(item.challenged.name)+"</b><br><br>"+
       "<b>Reason:</b> The submitted result was disputed.<br><br>"+
       "<b>Status:</b> Waiting for Admin to reopen score entry.<br><br>"+
       "<button class='acceptBtn smallBtn' onclick='adminReopenDisputedResult("+index+")'>Reopen Score Entry</button>"+
@@ -1566,8 +1573,8 @@ reviews.forEach((item,index)=>{
 }else{
     c.innerHTML+=
       "<div class='warning'>"+
-      "<b>"+item.challenger.name+" challenged "+item.challenged.name+"</b><br><br>"+
-      "<b>Decline reason:</b> "+item.declineReason+"<br><br>"+
+      "<b>"+escapeHtml(item.challenger.name)+" challenged "+escapeHtml(item.challenged.name)+"</b><br><br>"+
+      "<b>Decline reason:</b> "+escapeHtml(item.declineReason)+"<br><br>"+
       "<b>Status:</b> Waiting for admin review.<br><br>"+
       "<button class='acceptBtn smallBtn' onclick='approveDecline("+index+")'>Approve Decline</button> "+
       "<button class='declineBtn smallBtn' onclick='rejectDecline("+index+")'>Reject Decline</button>"+
@@ -1582,7 +1589,7 @@ reviews.forEach((item,index)=>{
 
   c.innerHTML +=
     "<div class='warning'>" +
-      "<b>🏖️ " + team.name + "</b><br><br>" +
+      "<b>🏖️ " + escapeHtml(team.name) + "</b><br><br>" +
       "<b>Away since:</b> " + awaySince + "<br><br>" +
       "<b>Status:</b> Away longer than 30 days — Admin Review required.<br><br>" +
       "<button class='acceptBtn smallBtn' onclick='adminReactivateAway(" +
@@ -1989,9 +1996,9 @@ if(challenge.status==="Decline Pending Admin Review"){
     "<h2>My Challenges</h2>"+
     "<div class='warning'>"+
     "<b>Decline Pending Admin Review</b><br><br>"+
-    "#"+challengerRank+" "+challenge.challenger.name+
-    " challenged #"+challengedRank+" "+challenge.challenged.name+
-    ".<br><br><b>Reason:</b> "+challenge.declineReason+
+    "#"+challengerRank+" "+escapeHtml(challenge.challenger.name)+
+    " challenged #"+challengedRank+" "+escapeHtml(challenge.challenged.name)+
+    ".<br><br><b>Reason:</b> "+escapeHtml(challenge.declineReason)+
     "<br><br><b>Status:</b> Waiting for admin review."+
     "</div>";
   return;
@@ -2003,8 +2010,8 @@ if(challenge.status==="Decline Pending Admin Review"){
         "<h2>My Challenges</h2>"+
         "<div class='success'>"+
         "<b>Outgoing Challenge</b><br><br>"+
-        "#"+challengerRank+" "+challenge.challenger.name+
-        " has challenged #"+challengedRank+" "+challenge.challenged.name+
+        "#"+challengerRank+" "+escapeHtml(challenge.challenger.name)+
+        " has challenged #"+challengedRank+" "+escapeHtml(challenge.challenged.name)+
         ".<br><br><b>Status:</b> Pending"+
         "</div>"+
         "<p class='muted'>Waiting for the challenged team to accept or decline.</p>"+
@@ -2016,8 +2023,8 @@ if(challenge.status==="Decline Pending Admin Review"){
       "<h2>My Challenges</h2>"+
       "<div class='warning'>"+
       "<b>Incoming Challenge</b><br><br>"+
-      "#"+challengerRank+" "+challenge.challenger.name+
-      " has challenged your team, #"+challengedRank+" "+challenge.challenged.name+"."+
+      "#"+challengerRank+" "+escapeHtml(challenge.challenger.name)+
+      " has challenged your team, #"+challengedRank+" "+escapeHtml(challenge.challenged.name)+"."+
       "</div>"+
       "<div class='actionRow'>"+
       "<button class='acceptBtn smallBtn' onclick='acceptChallenge()'>Accept Challenge</button>"+
@@ -2031,7 +2038,7 @@ if(challenge.status==="Decline Pending Admin Review"){
       "<h2>My Challenges</h2>"+
       "<div class='success'>"+
       "<b>Challenge Accepted</b><br><br>"+
-      challenge.challenged.name+" accepted the challenge from "+challenge.challenger.name+
+      escapeHtml(challenge.challenged.name)+" accepted the challenge from "+escapeHtml(challenge.challenger.name)+
       ".<br><br><b>Status:</b> Accepted"+
       "</div>"+
       "<p>The match must be played within 7 days.</p>"+
@@ -2043,8 +2050,8 @@ if(challenge.status==="Decline Pending Admin Review"){
     c.innerHTML=
       "<h2>My Challenges</h2>"+
       "<div class='warning'><b>Challenge Declined</b><br><br>"+
-      challenge.challenged.name+" declined the challenge from "+challenge.challenger.name+
-      ".<br><br><b>Reason:</b> "+challenge.declineReason+"</div>"+
+      escapeHtml(challenge.challenged.name)+" declined the challenge from "+escapeHtml(challenge.challenger.name)+
+      ".<br><br><b>Reason:</b> "+escapeHtml(challenge.declineReason)+"</div>"+
       "<button onclick='clearChallenge()'>Close Challenge</button>";
     return;
   }
@@ -2076,7 +2083,7 @@ if(challenge.status==="Decline Pending Admin Review"){
     c.innerHTML=
       "<h2>My Challenges</h2>"+
       "<div class='success'><b>Match Confirmed</b><br><br>"+
-      challenge.winner.name+" won the match.<br><br>"+
+      escapeHtml(challenge.winner.name)+" won the match.<br><br>"+
       "The leaderboard and W-L records have been updated."+
       "</div>"+
       "<button onclick='show(\"board\")'>View Leaderboard</button>";
@@ -2302,12 +2309,12 @@ function renderScore(){
 
   c.innerHTML=
     "<h2>Enter Score</h2>"+
-    "<div class='notice'><b>"+challenge.challenger.name+
-    " vs. "+challenge.challenged.name+"</b><br>"+
+    "<div class='notice'><b>"+escapeHtml(challenge.challenger.name)+
+    " vs. "+escapeHtml(challenge.challenged.name)+"</b><br>"+
     "Best 3 of 5 games to 11, win by 2.</div>"+
 
     "<table class='scoreTable'>"+
-    "<tr><th>Game</th><th>"+challenge.challenger.name+"</th><th>"+challenge.challenged.name+"</th></tr>"+
+    "<tr><th>Game</th><th>"+escapeHtml(challenge.challenger.name)+"</th><th>"+escapeHtml(challenge.challenged.name)+"</th></tr>"+
 
     "<tr><td>Game 1</td>"+
     "<td><input id='g1a' type='number' min='0'></td>"+
@@ -2450,11 +2457,11 @@ function scoreSummary(){
 
   challenge.scores.forEach((score,i)=>{
     html+="Game "+(i+1)+": "+
-      challenge.challenger.name+" "+score[0]+
-      " - "+score[1]+" "+challenge.challenged.name+"<br>";
+      escapeHtml(challenge.challenger.name)+" "+score[0]+
+      " - "+score[1]+" "+escapeHtml(challenge.challenged.name)+"<br>";
   });
 
-  html+="<br><b>Reported winner:</b> "+challenge.winner.name;
+  html+="<br><b>Reported winner:</b> "+escapeHtml(challenge.winner.name);
 
   return html;
 }
@@ -2694,10 +2701,10 @@ function renderPartners(){
                 : "<span class='muted'>Sign in to send an invitation.</span>";
 
             return "<div class='success'>" +
-              "<b>" + player.name + "</b><br>" +
-              "Gender: " + player.gender + "<br>" +
-              "DUPR: " + player.dupr + "<br>" +
-              "Looking for: " + player.ladder + "<br><br>" +
+              "<b>" + escapeHtml(player.name) + "</b><br>" +
+              "Gender: " + escapeHtml(player.gender) + "<br>" +
+              "DUPR: " + escapeHtml(player.dupr) + "<br>" +
+              "Looking for: " + escapeHtml(player.ladder) + "<br><br>" +
               inviteButton +
             "</div><br>";
           }).join("")
@@ -2746,9 +2753,9 @@ function renderPartners(){
             }
 
             return "<div class='success'>" +
-              "<b>From:</b> " + invite.from + "<br>" +
-              "<b>To:</b> " + invite.to + "<br>" +
-              "<b>Status:</b> " + invite.status + "<br><br>" +
+              "<b>From:</b> " + escapeHtml(invite.from) + "<br>" +
+              "<b>To:</b> " + escapeHtml(invite.to) + "<br>" +
+              "<b>Status:</b> " + escapeHtml(invite.status) + "<br><br>" +
               inviteActions +
             "</div><br>";
           }).join("")
