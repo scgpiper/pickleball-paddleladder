@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { makeHandler } from "../api/challenge-notification.js";
+import { makeHandler, makeVercelHandler } from "../api/challenge-notification.js";
 
 const originalEnv = { ...process.env };
 const secret = "test-webhook-secret";
@@ -72,9 +72,8 @@ function mocks({ failEmail = "" } = {}) {
       messages.push(message);
     }
   };
-  return { claims, messages, handler: makeHandler({
-    dbFactory: () => db, mailerFactory: () => mailer
-  }) };
+  const options = { dbFactory: () => db, mailerFactory: () => mailer };
+  return { claims, messages, handler: makeHandler(options), vercelHandler: makeVercelHandler(options) };
 }
 
 test.after(() => { process.env = originalEnv; });
@@ -110,4 +109,24 @@ test("releases an explicit SMTP failure so a retry can send that recipient", asy
   assert.equal(result.status, 503);
   assert.deepEqual([...claims], ["second@example.com"]);
   assert.equal(messages.length, 1);
+});
+
+test("Vercel Node request and response deliver challenge email", async () => {
+  configure();
+  const { vercelHandler, messages } = mocks();
+  const result = { headers: {} };
+  const res = {
+    setHeader(key, value) { result.headers[key] = value; },
+    status(status) { result.status = status; return this; },
+    json(body) { result.body = body; return this; }
+  };
+  await vercelHandler({
+    method: "POST",
+    headers: { "x-challenge-webhook-secret": secret },
+    body: { type: "INSERT", schema: "public", table: "challenges", record: { id: challengeId } }
+  }, res);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.sent, 2);
+  assert.equal(result.headers["Cache-Control"], "no-store");
+  assert.equal(messages.length, 2);
 });
