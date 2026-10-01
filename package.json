@@ -1,0 +1,9 @@
+{
+  "name": "pickleball-paddleladder",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0",
+    "nodemailer": "^10.0.6"
+  }
+}
