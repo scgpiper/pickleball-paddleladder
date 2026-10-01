@@ -160,4 +160,25 @@ return async function handler(request) {
 };
 }
 
-export default makeHandler();
+// Vercel's Node.js functions receive IncomingMessage/ServerResponse, rather
+// than the Web Request/Response used by the core handler above.
+export function makeVercelHandler(options) {
+  const handle = makeHandler(options);
+  return async function vercelHandler(req, res) {
+    const body = typeof req.body === "string" || Buffer.isBuffer(req.body)
+      ? req.body
+      : JSON.stringify(req.body ?? {});
+    const result = await handle(new Request("https://pickleball-paddleladder.vercel.app/api/challenge-notification", {
+      method: req.method,
+      headers: {
+        "content-type": "application/json",
+        "x-challenge-webhook-secret": req.headers?.["x-challenge-webhook-secret"] || ""
+      },
+      body: req.method === "POST" ? body : undefined
+    }));
+    res.setHeader("Cache-Control", "no-store");
+    res.status(result.status).json(await result.json());
+  };
+}
+
+export default makeVercelHandler();
