@@ -393,26 +393,103 @@ async function loadCurrentUser(){
   currentUserIsAdmin = adminCheck.data === true;
 }
 
-async function signInWithEmail(){
-  const email = prompt("Enter your email address:");
+function enteredEmail(){
+  return document.getElementById("authEmail")?.value.trim() || "";
+}
 
-  if(email === null || email.trim() === ""){
+async function signInWithPassword(){
+  const email = enteredEmail();
+  const password = document.getElementById("authPassword")?.value || "";
+
+  if(!email || !password){
+    alert("Enter your email and password.");
     return;
   }
 
-  const { error } = await dbClient.auth.signInWithOtp({
-    email: email.trim(),
-    options: {
-      emailRedirectTo: window.location.origin
-    }
-  });
+  const { error } = await dbClient.auth.signInWithPassword({ email, password });
 
   if(error){
     alert("Sign-in failed: " + error.message);
     return;
   }
 
+  await loadCurrentUser();
+  if(await loadLadderState()){
+    myTeam = isAdmin() ? null : findCurrentUsersTeam();
+    show("board");
+  }
+}
+
+async function signInWithEmail(){
+  const email = enteredEmail();
+
+  if(!email){
+    alert("Enter your email address.");
+    return;
+  }
+
+  const { error } = await dbClient.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin }
+  });
+
+  if(error){
+    alert("Sign-in link failed: " + error.message);
+    return;
+  }
+
   alert("Check your email and click the PaddleLadder sign-in link.");
+}
+
+async function sendPasswordReset(){
+  const email = enteredEmail();
+
+  if(!email){
+    alert("Enter your email address first.");
+    return;
+  }
+
+  const { error } = await dbClient.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin
+  });
+
+  if(error){
+    alert("Password reset failed: " + error.message);
+    return;
+  }
+
+  alert("If this email has an account, check your inbox for a password reset link.");
+}
+
+async function updatePassword(){
+  if(!currentUser){
+    alert("Sign in or follow your password reset link first.");
+    return;
+  }
+
+  const password = document.getElementById("newPassword")?.value || "";
+  const confirmation = document.getElementById("confirmPassword")?.value || "";
+
+  if(password.length < 8){
+    alert("Use a password with at least 8 characters.");
+    return;
+  }
+
+  if(password !== confirmation){
+    alert("The passwords do not match.");
+    return;
+  }
+
+  const { error } = await dbClient.auth.updateUser({ password });
+
+  if(error){
+    alert("Password update failed: " + error.message);
+    return;
+  }
+
+  document.getElementById("newPassword").value = "";
+  document.getElementById("confirmPassword").value = "";
+  alert("Password saved. You can use it to sign in next time.");
 }
 
 async function signOutUser(){
@@ -1226,10 +1303,22 @@ function renderBoard(){
     ? "<div class='success'>" +
         "<b>Signed in:</b> " + escapeHtml(currentUser.email) + "<br><br>" +
         "<button class='smallBtn' onclick='signOutUser()'>Sign Out</button>" +
+        "<details><summary>Set or change your password</summary>" +
+          "<p>Once saved, use your email and password to sign in.</p>" +
+          "<input id='newPassword' type='password' autocomplete='new-password' placeholder='New password (8 or more characters)'>" +
+          "<input id='confirmPassword' type='password' autocomplete='new-password' placeholder='Confirm new password'>" +
+          "<button class='smallBtn' onclick='updatePassword()'>Save Password</button>" +
+        "</details>" +
       "</div>"
     : "<div class='warning'>" +
         "<b>You are viewing the public ladder.</b><br><br>" +
-        "<button class='smallBtn' onclick='signInWithEmail()'>Sign In by Email</button>" +
+        "<label for='authEmail'>Email</label>" +
+        "<input id='authEmail' type='email' autocomplete='username' placeholder='Email address'>" +
+        "<label for='authPassword'>Password</label>" +
+        "<input id='authPassword' type='password' autocomplete='current-password' placeholder='Password'>" +
+        "<button class='smallBtn' onclick='signInWithPassword()'>Sign In</button> " +
+        "<button class='smallBtn' onclick='signInWithEmail()'>Email me a sign-in link</button> " +
+        "<button class='smallBtn' onclick='sendPasswordReset()'>Set or reset password</button>" +
       "</div>";
 
   const assignmentHtml =
