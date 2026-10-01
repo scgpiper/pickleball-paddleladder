@@ -646,6 +646,8 @@ async function loadLadderState(){
     return {
       challenger: item.challenger.name,
       challenged: item.challenged.name,
+      challengerTeamId: item.challenger.id,
+      challengedTeamId: item.challenged.id,
       status: item.status,
       declineReason: item.declineReason,
       createdAt: item.createdAt,
@@ -659,6 +661,8 @@ async function loadLadderState(){
     return {
       teamA: item.challenger.name,
       teamB: item.challenged.name,
+      teamAId: item.challenger.id,
+      teamBId: item.challenged.id,
       completedAt: item.completedAt,
       forfeit: item.forfeit
     };
@@ -667,6 +671,7 @@ async function loadLadderState(){
     const movementTeam = teamById.get(row.team_id);
     return {
       team: movementTeam ? movementTeam.name : "Removed team",
+      teamId: row.team_id,
       ladder: row.ladder || "mens",
       fromRank: row.from_rank,
       toRank: row.to_rank,
@@ -1102,6 +1107,7 @@ function recordLadderMovements(previousRanks,reason){
     if(newRank !== item.rank){
       ladderMovementHistory.push({
         team: item.team.name,
+        teamId: item.team.id,
         ladder: item.ladder || item.team.ladder || "mens",
         fromRank: item.rank,
         toRank: newRank,
@@ -1406,8 +1412,8 @@ const challengeBusy = pendingChallenges.some(item =>
 
 const rematchLocked = !!myTeam && matchHistory.some(match => {
     const samePair =
-        (match.teamA === myTeam.name && match.teamB === team.name) ||
-        (match.teamA === team.name && match.teamB === myTeam.name);
+        (match.teamAId === myTeam.id && match.teamBId === team.id) ||
+        (match.teamAId === team.id && match.teamBId === myTeam.id);
 
     return samePair && (Date.now() - match.completedAt < sevenDays);
 });
@@ -1532,22 +1538,22 @@ function renderHistory(){
       : Number(selectedTeam.dupr).toFixed(2);
 
   const issued = challengeHistory.filter(item =>
-    item.challenger === selectedTeam.name
+    item.challengerTeamId === selectedTeam.id
   ).length;
 
   const received = challengeHistory.filter(item =>
-    item.challenged === selectedTeam.name
+    item.challengedTeamId === selectedTeam.id
   ).length;
 
   const teamHistory = challengeHistory.filter(item =>
-    item.challenger === selectedTeam.name ||
-    item.challenged === selectedTeam.name
+    item.challengerTeamId === selectedTeam.id ||
+    item.challengedTeamId === selectedTeam.id
   );
 
   const selectedLadder = selectedTeam.ladder || "mens";
 
   const movementHistory = ladderMovementHistory.filter(item =>
-    item.team === selectedTeam.name &&
+    item.teamId === selectedTeam.id &&
     (item.ladder || "mens") === selectedLadder
   );
 
@@ -2689,8 +2695,8 @@ function cancelInvalidPendingChallenges(){
 
       const historyItem = challengeHistory.findLast(function(history){
         return (
-          history.challenger === item.challenger.name &&
-          history.challenged === item.challenged.name &&
+          history.challengerTeamId === item.challenger.id &&
+          history.challengedTeamId === item.challenged.id &&
           history.status === "Pending"
         );
       });
