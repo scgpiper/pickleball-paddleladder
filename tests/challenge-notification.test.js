@@ -31,6 +31,13 @@ function mocks({ failEmail = "" } = {}) {
   const claims = new Set();
   const messages = [];
   const db = {
+    rpc(name, args) {
+      assert.equal(name, "challenge_notification_recipients_secure");
+      assert.equal(args.requested_challenge_id, challengeId);
+      return Promise.resolve({ data: [
+        { email: "first@example.com" }, { email: "second@example.com" }
+      ], error: null });
+    },
     from(table) {
       if (table === "challenges") return {
         select: () => ({ eq: () => ({ single: async () => ({
@@ -44,11 +51,6 @@ function mocks({ failEmail = "" } = {}) {
         select: () => ({ in: async () => ({ data: [
           { id: challengerId, name: "Challengers", club_id: "club", ladder: "mixed" },
           { id: challengedId, name: "Defenders", club_id: "club", ladder: "mixed" }
-        ], error: null }) })
-      };
-      if (table === "team_members") return {
-        select: () => ({ eq: async () => ({ data: [
-          { email: "first@example.com" }, { email: "second@example.com" }
         ], error: null }) })
       };
       if (table === "challenge_email_notices") return {
