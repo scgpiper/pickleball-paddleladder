@@ -6,7 +6,8 @@ and uses server-side SMTP. The browser never receives SMTP or service-role keys.
 Each challenge/email pair is reserved in `challenge_email_notices` to avoid
 repeat email on duplicate webhook delivery.
 
-1. Apply `sql/challenge_email_notices.sql` in the **main** Supabase project.
+1. Apply `sql/challenge_email_notices.sql` and
+   `sql/challenge_notification_recipients.sql` in the **main** Supabase project.
 2. In the main Vercel project, add Production environment variables:
    `SUPABASE_URL` (main project URL),
    `SUPABASE_SERVICE_ROLE_KEY` (main project's secret service-role key),
