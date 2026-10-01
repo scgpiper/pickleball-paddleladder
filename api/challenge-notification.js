@@ -74,8 +74,10 @@ return async function handler(request) {
     return response(400, { error: "Challenge team mismatch" });
   }
 
-  const { data: members, error: memberError } = await db.from("team_members")
-    .select("email").eq("team_id", challenged.id);
+  const { data: members, error: memberError } = await db.rpc(
+    "challenge_notification_recipients_secure",
+    { requested_challenge_id: challenge.id }
+  );
   if (memberError) {
     console.error("Challenge notification recipient lookup failed", memberError);
     return response(500, { error: "Could not load recipients" });
