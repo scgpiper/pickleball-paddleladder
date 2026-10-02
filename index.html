@@ -62,7 +62,7 @@ header{
   background:linear-gradient(90deg,rgba(231,255,238,.55) 0 33%,transparent 33% 67%,rgba(231,255,238,.55) 67% 100%);
 }
 
-header h1{margin:0;font-size:clamp(26px,4vw,36px);letter-spacing:-.03em}
+header h1{margin:0;font-size:clamp(24px,3.2vw,32px);letter-spacing:-.03em;line-height:1.08}
 header p{margin:7px 0 0;color:#d6e6e3}
 .header-inner{
   position:relative;
@@ -76,7 +76,7 @@ header p{margin:7px 0 0;color:#d6e6e3}
 }
 .header-kicker{
   color:#d7ed3d;
-  font-size:clamp(26px,4vw,36px);
+  font-size:clamp(24px,3.2vw,32px);
   font-weight:800;
   letter-spacing:-.03em;
   line-height:1.08;
@@ -218,8 +218,8 @@ select{
 @media(max-width:650px){
   header{padding:23px 17px}
   .court-art{right:-100px;width:300px;height:145px;opacity:.65}
-  .header-inner{align-items:flex-start}
-  .sponsor{padding-left:12px}
+  .header-inner{display:block}
+  .sponsor{display:inline-block;margin-top:16px;padding-left:0;border-left:0;text-align:left}
   .sponsor-name{font-size:13px}
   .sponsor-label{font-size:9px}
   .sponsor-logo-frame{width:72px;height:72px;flex-basis:72px}
