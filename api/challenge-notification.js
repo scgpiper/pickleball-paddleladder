@@ -105,7 +105,7 @@ return async function handler(request) {
     socketTimeout: 15000
   });
 
-  const deadline = new Date(new Date(challenge.created_at).getTime() + 72 * 60 * 60 * 1000);
+  const deadline = new Date(new Date(challenge.created_at).getTime() + 24 * 60 * 60 * 1000);
   const deadlineText = deadline.toLocaleString("en-CA", {
     timeZone: "America/Vancouver", year: "numeric", month: "short", day: "numeric",
     hour: "numeric", minute: "2-digit", timeZoneName: "short"
