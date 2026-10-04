@@ -105,12 +105,12 @@ return async function handler(request) {
     socketTimeout: 15000
   });
 
-  const deadline = new Date(new Date(challenge.created_at).getTime() + 24 * 60 * 60 * 1000);
+  const deadline = new Date(new Date(challenge.created_at).getTime() + 48 * 60 * 60 * 1000);
   const deadlineText = deadline.toLocaleString("en-CA", {
     timeZone: "America/Vancouver", year: "numeric", month: "short", day: "numeric",
     hour: "numeric", minute: "2-digit", timeZoneName: "short"
   });
-  const siteUrl = "https://pickleball-paddleladder.vercel.app/";
+  const siteUrl = "https://ladder.pickleballpatrol.ca/";
   const message = [
     `Your team, ${challenged.name}, has received a Pickleball PaddleLadder challenge from ${challenger.name}.`,
     "",

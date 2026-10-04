@@ -97,8 +97,8 @@ test("emails each assigned player once and handles duplicate webhook delivery", 
     "first@example.com", "second@example.com"
   ]);
   assert.match(messages[0].text, /accept or decline by/);
-  assert.match(messages[0].text, /Oct 2, 2026/);
-  assert.match(messages[0].text, /pickleball-paddleladder\.vercel\.app/);
+  assert.match(messages[0].text, /Oct 3, 2026/);
+  assert.match(messages[0].text, /ladder\.pickleballpatrol\.ca/);
   assert.equal(claims.size, 2);
   const second = await handler(event());
   assert.equal((await second.json()).duplicate, 2);
