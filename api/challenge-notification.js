@@ -110,7 +110,7 @@ return async function handler(request) {
     timeZone: "America/Vancouver", year: "numeric", month: "short", day: "numeric",
     hour: "numeric", minute: "2-digit", timeZoneName: "short"
   });
-  const siteUrl = "https://ladder.pickleballpatrol.ca/";
+  const siteUrl = "https://vpaladder.pickleballpatrol.ca/";
   const message = [
     `Your team, ${challenged.name}, has received a Pickleball PaddleLadder challenge from ${challenger.name}.`,
     "",
