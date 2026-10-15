@@ -1,0 +1,42 @@
+# Multi-club rollout design (working draft)
+
+## Goal
+
+Each club has its own registration link. A team signs up on its own club's page. The same player may use the same email and sign-in at two or more clubs, with separate team enrollment at each. Every leaderboard, challenge, score, partner action, and club administrator action is scoped to the selected club. Existing VPA records and the current URL remain attached to VPA. No other club is populated with VPA teams.
+
+## Existing app inventory
+
+The page in `index.html` reads `public.ladder_teams`, `public.challenges`, `public.ladder_movements`, `public.partner_listings`, and `public.partner_invites` without a club filter. `private.team_members` associates users and email addresses with teams. The lobby independently reads `ladder_teams`; its VPA name is currently a constant.
+
+The current application calls these authorization and maintenance functions: `is_app_admin`, `user_belongs_to_team`, `admin_get_team_members_secure`, `refresh_challenge_deadlines_secure`, and `refresh_acceptance_enforcement_secure`.
+
+Its mutations use: `admin_assign_team_members_secure`, `set_team_away_secure`, `admin_remove_team_secure`, `admin_add_team_secure`, `review_away_team_secure`, `review_overdue_match_secure`, `record_forfeit_secure`, `issue_challenge_secure`, `respond_to_challenge_secure`, `review_decline_secure`, `cancel_challenge_secure`, `submit_result_secure`, `confirm_result_secure`, `admin_reset_disputed_result_secure`, `remove_partner_listing_secure`, `create_partner_listing_secure`, `send_partner_invite_secure`, `accept_partner_invite_secure`, `decline_partner_invite_secure`, and `cancel_partner_invite_secure`.
+
+## Findings from the 425-row schema inventory\n\nThe database already has `public.clubs` (`id`, `slug`, `name`, `active`) and `public.club_memberships` with unique `(club_id, user_id)`, plus `public.ladders`, `public.teams`, and legacy challenge/match tables. Those club-aware legacy tables are distinct from the **live** app tables in `index.html`. The live `ladder_teams`, `challenges`, `ladder_movements`, `partner_listings`, `partner_invites`, and `private.team_members` currently have no `club_id`. The live RPCs also use `is_app_admin()` and filter by ladder name alone. The existing `is_club_admin(club_id)` applies to the other data model and does not automatically secure these live actions.\n\nGlobal live indexes currently prevent the same team name, player email, user, or active partner listing in the same ladder at two different clubs. Those indexes must be replaced with club-scoped equivalents as part of the final rollout. Existing `club_memberships` can be reused; do not create a duplicate table or impose global uniqueness on email.\n\n`01_live_club_backfill_DRAFT.sql` is an additive first-stage migration preserving VPA behavior. It is not the complete multi-club migration and must not be applied alone or merged before club-aware RPCs, indexes, RLS, and frontend are ready.\n\n## Database boundaries
+
+- Reuse `public.clubs` with its existing UUID, slug, display name, and active flag. Club branding can be added later as needed.
+- Reuse `public.club_memberships` and `is_club_admin(club_id)` for per-club roles. A club administrator has access only to clubs where assigned. Keep `private.app_admins` as an explicit platform role, with a separate decision about whether platform administrators may operate on all clubs.
+- Reuse `public.club_memberships` keyed by `(club_id, user_id)`. The same auth user may appear in multiple clubs. Existing `private.team_members` remains the live team roster; its global `(ladder, lower(email))` and `(ladder, user_id)` unique indexes must include `club_id`, and every roster change must verify the team's club. Do not require a separate Supabase Auth project per club.
+- Add a non-null `club_id` to each directly queried **live** club-owned table: `ladder_teams`, `challenges`, `ladder_movements`, `partner_listings`, and `partner_invites`. Derive and backfill each dependent row from its referenced team or listing where possible, checking for conflicting references. `private.team_members` also needs `club_id` to scope existing unique indexes and admin roster reads.
+- Replace uniqueness scoped only to ladder or email with appropriate club-aware uniqueness where required. Preserve a team primary key and use composite foreign keys or checked functions so related IDs cannot connect rows from different clubs.
+- Enable and verify RLS and grants for every exposed table. Public standings may be readable by club; private emails and user IDs must remain restricted. Set each SECURITY DEFINER function's search path and validate both the caller's club authority and the club of **every** referenced row. Client-provided club IDs are context, not proof of permission. For a team action, derive the club from that team and verify every other team, challenge, invite and listing belongs to it.
+- Scheduled/deadline functions must process rows within each club without allowing the caller to supply a target outside authorized scope. The schema inventory is needed to decide whether these functions may be called by clients at all.
+
+## App behavior
+
+Resolve `?club=<slug>` from `clubs`, defaulting to VPA for preexisting links. Display the resolved club name in app header and lobby, with `?club=<slug>&screen=lobby` as a shareable screen link. A missing or inactive slug shows a clear error instead of another club's standings. Filter all five table reads by the resolved club ID; reset selected team, challenge, history, and admin state when clubs change. Evaluate admin access against the selected club and pass club context to functions that require it. A player can visit another club's public page and sign in with the same email, but receives team or admin actions there only after joining that club or being explicitly assigned as its admin. Sign-in links should return to the club URL that initiated sign-in. New club creation and first admin assignment must be a platform-admin-only operation; public visitors cannot self-create a club or appoint themselves.
+
+## Registration rule
+
+A team is registered only in the club whose page created it. A person can join a separate team at another club using the same email and Supabase sign-in. Club membership and team membership must be keyed by club context, so the same email is not treated as a duplicate across clubs. Merely changing the club URL does not move a team, grant club administration, or authorize a challenge. Existing VPA membership is backfilled from VPA rosters.
+
+## Migration order
+
+1. Export metadata with `inspect_schema_readonly.sql`; review columns, existing keys, policies, triggers, and exact function bodies. Inventory currently reads *definitions*, not rows.
+2. Build a transaction-safe migration from the **actual** schema. Reuse or create the VPA row, backfill existing live records, add constraints and club-specific indexes, and install per-club policies/functions. Detect inconsistent or orphaned historical rows before committing.
+3. Verify production data counts and representative VPA standings before and after in a read-only check; exercise signed-out visitor, one email enrolled independently at clubs A and B, club A admin, club B admin, and platform admin against allowed and denied operations. Confirm cross-club IDs are rejected by RPCs even if a client bypasses page filters.
+4. Deploy the compatible frontend after the migration and verify the old URL, VPA lobby, and each newly provisioned club URL. Add other clubs only after the isolation tests pass.
+
+## Current state
+
+This document and the schema inventory query are preparation only. No database change or frontend club separation is deployed. The implementation depends on the metadata export because the repository does not contain database migrations or the existing PostgreSQL function definitions.
