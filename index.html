@@ -536,7 +536,7 @@ async function loadLadderState(){
 
   const results = await Promise.all([
     dbClient.from("ladder_teams").select("*").order("ladder").order("rank_position"),
-    dbClient.from("challenges").select("*").order("created_at", { ascending: false }),
+    dbClient.from("challenge_public_feed").select("*").order("created_at", { ascending: false }),
     dbClient.from("ladder_movements").select("*").order("created_at", { ascending: false }),
     dbClient.from("partner_listings").select("*").eq("status", "Active").order("created_at", { ascending: false }),
     currentUser
@@ -544,6 +544,9 @@ async function loadLadderState(){
       : Promise.resolve({ data: [], error: null }),
     currentUser && isAdmin()
       ? dbClient.rpc("admin_get_team_members_secure")
+      : Promise.resolve({ data: [], error: null }),
+    currentUser
+      ? dbClient.from("challenges").select("*")
       : Promise.resolve({ data: [], error: null })
   ]);
 
@@ -617,7 +620,13 @@ async function loadLadderState(){
     return [team.id,team];
   }));
 
-  const allChallenges = (results[1].data || []).map(function(row){
+  // The public feed excludes private reasons and submitted scores. RLS on the
+  // full table returns details only for participants and club/app admins.
+  const privateChallengeById = new Map(
+    (results[6].data || []).map(function(row){ return [row.id,row]; })
+  );
+  const allChallenges = (results[1].data || []).map(function(publicRow){
+    const row = Object.assign({},publicRow,privateChallengeById.get(publicRow.id) || {});
     return {
       id: row.id,
       ladder: row.ladder || "mens",
