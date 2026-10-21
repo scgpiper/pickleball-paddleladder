@@ -26,11 +26,18 @@ return async function handler(request) {
 
   const required = [
     "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SMTP_HOST",
-    "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM"
+    "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM", "LADDER_SITE_URL"
   ];
   if (required.some(key => !process.env[key])) {
     console.error("Challenge notification configuration is incomplete");
     return response(503, { error: "Notifications are not configured" });
+  }
+  let siteUrl;
+  try {
+    siteUrl = new URL(process.env.LADDER_SITE_URL);
+    if (siteUrl.protocol !== "https:") throw new Error("HTTPS required");
+  } catch {
+    return response(503, { error: "Invalid ladder site URL" });
   }
 
   let payload;
@@ -110,15 +117,14 @@ return async function handler(request) {
     timeZone: "America/Vancouver", year: "numeric", month: "short", day: "numeric",
     hour: "numeric", minute: "2-digit", timeZoneName: "short"
   });
-  const siteUrl = "https://vpaladder.pickleballpatrol.ca/";
   const message = [
-    `Your team, ${challenged.name}, has received a Pickleball PaddleLadder challenge from ${challenger.name}.`,
+    `Your team, ${challenged.name}, has received an Okanagan Pickleball Ladder challenge from ${challenger.name}.`,
     "",
     `Please sign in and accept or decline by ${deadlineText}.`,
     "",
-    `Open the ladder: ${siteUrl}`,
+    `Open the ladder: ${siteUrl.href}`,
     "",
-    "If you are not part of this team, let the club organizer know."
+    "If you are not part of this team, let the ladder organizer know."
   ].join("\n");
 
   let sent = 0;
@@ -141,7 +147,7 @@ return async function handler(request) {
       await transport.sendMail({
         from: process.env.SMTP_FROM,
         to: email,
-        subject: "New PaddleLadder challenge for your team",
+        subject: "New Okanagan Pickleball Ladder challenge for your team",
         text: message
       });
       const { error: markError } = await db.from("challenge_email_notices")

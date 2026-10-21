@@ -13,7 +13,8 @@ function configure() {
     CHALLENGE_WEBHOOK_SECRET: secret, SUPABASE_URL: "https://example.supabase.co",
     SUPABASE_SERVICE_ROLE_KEY: "test-secret", SMTP_HOST: "smtp.example.com",
     SMTP_PORT: "465", SMTP_USER: "sender@example.com",
-    SMTP_PASSWORD: "test-password", SMTP_FROM: "PaddleLadder <sender@example.com>"
+    SMTP_PASSWORD: "test-password", SMTP_FROM: "PaddleLadder <sender@example.com>",
+    LADDER_SITE_URL: "https://okanagan.example.com/"
   });
 }
 
@@ -98,7 +99,7 @@ test("emails each assigned player once and handles duplicate webhook delivery", 
   ]);
   assert.match(messages[0].text, /accept or decline by/);
   assert.match(messages[0].text, /Oct 3, 2026/);
-  assert.match(messages[0].text, /vpaladder\.pickleballpatrol\.ca/);
+  assert.match(messages[0].text, /okanagan\.example\.com/);
   assert.equal(claims.size, 2);
   const second = await handler(event());
   assert.equal((await second.json()).duplicate, 2);
