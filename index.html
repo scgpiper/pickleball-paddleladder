@@ -40,23 +40,20 @@ header p{margin:15px 0 0;color:#f2f8ec;font-size:clamp(16px,1.6vw,20px);font-wei
 .sponsor{
   flex:0 0 auto;
   text-align:right;
-  background:rgba(11,39,45,.66);
-  border:1px solid rgba(255,255,255,.3);
-  border-radius:16px;
-  padding:12px 16px;
-  backdrop-filter:blur(6px);
+  background:rgba(11,39,45,.32);
+  border-radius:12px;
+  padding:8px 10px;
 }
 .sponsor-label{
   display:block;
   color:#e6f0e8;
-  font-size:11px;
+  font-size:10px;
   letter-spacing:.12em;
   text-transform:uppercase;
   margin-bottom:5px;
 }
-.sponsor-name{font-size:18px;font-weight:800;color:#d7ed3d}
 .sponsor-content{display:flex;align-items:center;justify-content:flex-end;gap:12px}
-.sponsor-logo-frame{display:block;width:112px;height:112px;flex:0 0 112px}
+.sponsor-logo-frame{display:block;width:76px;height:76px;flex:0 0 76px}
 .sponsor-logo{display:block;width:100%;height:100%;object-fit:contain}
 @media(min-width:1200px){
   .sponsor{transform:translateX(calc((100vw - 1060px)/2 - 28px))}
@@ -74,19 +71,14 @@ main{
   gap:12px;
 }
 
-body.court-tabs .grid{
+.grid{
   padding:24px;
   border-radius:18px;
   background:linear-gradient(90deg,rgba(10,42,48,.64),rgba(10,42,48,.4)),url("court-tabs.jpg") center 53% / cover;
   box-shadow:0 12px 28px rgba(11,45,48,.16);
 }
-body.court-tabs .grid button:not(:first-child){background:rgba(15,84,105,.94)}
-body.court-tabs .grid button:not(:first-child):hover{background:#125263}
-body.court-tabs .join-photo{display:none}
-body.court-tabs .join-section{display:block}
-.design-switch{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
-.design-switch button{font-size:14px;padding:10px 14px;background:#176678}
-.design-switch button[aria-pressed="true"]{background:#d7ed3d;color:#163139}
+.grid button:not(:first-child){background:rgba(15,84,105,.94)}
+.grid button:not(:first-child):hover{background:#125263}
 
 .grid button{min-height:66px;text-align:left;padding:16px 20px}
 .grid button:first-child{background:#d7ed3d;color:#163139}
@@ -165,12 +157,10 @@ th,td{
 .success{background:#eaf8ee}
 .warning{background:#fff3cd}
 
-.join-section{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(240px,.85fr);gap:24px;align-items:stretch;padding:20px}
+.join-section{padding:20px}
 .join-copy{min-width:0}
 .join-copy h3{margin-top:0}
-.join-copy .auth-form{max-width:none}
-.join-photo{margin:0;min-height:310px}
-.join-photo img{display:block;width:100%;height:100%;min-height:310px;object-fit:cover;object-position:52% center;border-radius:12px}
+.join-copy .auth-form{max-width:430px}
 .join-section button:disabled{cursor:not-allowed;opacity:.7;transform:none}
 
 .auth-form{display:grid;gap:10px;max-width:430px;margin-top:12px}
@@ -209,16 +199,14 @@ select{
   header{padding:46px 20px;background-position:center,56% center}
   .header-inner{display:block}
   .sponsor{display:inline-block;margin-top:25px;text-align:left}
-  .sponsor-name{font-size:13px}
   .sponsor-label{font-size:9px}
-  .sponsor-logo-frame{width:72px;height:72px;flex-basis:72px}
+  .sponsor-logo-frame{width:62px;height:62px;flex-basis:62px}
   .sponsor-content{gap:7px}
   main{padding:16px 12px 32px}
   .grid{grid-template-columns:1fr 1fr;gap:9px}
   .grid button{min-height:64px;padding:11px;font-size:14px;text-align:center}
-  body.court-tabs .grid{padding:13px}
-  .join-section{grid-template-columns:1fr;gap:14px;padding:16px}
-  .join-photo,.join-photo img{height:190px;min-height:190px}
+  .grid{padding:13px}
+  .join-section{padding:16px}
   th:nth-child(3),td:nth-child(3){display:none}
 }
 @media(max-width:390px){
@@ -292,7 +280,6 @@ body.lobby-mode > header,body.lobby-mode > main{display:none}
     <div class="sponsor" aria-label="Presented by Pickleball Patrol">
       <span class="sponsor-label">Presented by</span>
       <div class="sponsor-content">
-        <span class="sponsor-name">Pickleball Patrol</span>
         <span class="sponsor-logo-frame"><img class="sponsor-logo" src="Pickleball-Patrol-transparent%20(1).png" alt="Pickleball Patrol logo" width="112" height="112"></span>
       </div>
     </div>
@@ -343,32 +330,17 @@ body.lobby-mode > header,body.lobby-mode > main{display:none}
 const SUPABASE_URL = "https://YOUR_INDEPENDENT_PROJECT_REF.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "YOUR_INDEPENDENT_PROJECT_PUBLISHABLE_KEY";
 document.getElementById("lobbySiteAddress").textContent = window.location.host || "this site";
-if(new URLSearchParams(window.location.search).get("court") !== "beside"){
-  document.body.classList.add("court-tabs");
-}
 if (SUPABASE_URL.includes("YOUR_INDEPENDENT_PROJECT_REF") ||
     SUPABASE_PUBLISHABLE_KEY.includes("YOUR_INDEPENDENT_PROJECT_PUBLISHABLE_KEY")) {
   document.getElementById("content").innerHTML =
     "<div class='warning'>Design preview. Registration is not open yet.</div>" +
-    "<div class='design-switch' aria-label='Compare court photo placement'>" +
-    "<button type='button' id='courtBeside'>Beside signup</button>" +
-    "<button type='button' id='courtBehind'>Behind the tabs</button></div>" +
     "<section class='notice join-section'><div class='join-copy'>" +
     "<h3>Join the ladder with a partner</h3>" +
     "<p>Create a two-player team. Your partner signs in and accepts before your team appears on the ladder.</p>" +
     "<div class='auth-form'><label>Team name<input disabled placeholder='Your team name'></label>" +
     "<label>Your name<input disabled placeholder='Your name'></label>" +
     "<label>Partner's email<input disabled placeholder='partner@example.com'></label>" +
-    "<button disabled>Ask partner to join</button></div></div>" +
-    "<figure class='join-photo'><img src='local-court.jpg' alt='An empty local pickleball court ready for play'></figure></section>";
-  function showCourtPlacement(behindTabs){
-    document.body.classList.toggle("court-tabs",behindTabs);
-    document.getElementById("courtBeside").setAttribute("aria-pressed",String(!behindTabs));
-    document.getElementById("courtBehind").setAttribute("aria-pressed",String(behindTabs));
-  }
-  document.getElementById("courtBeside").addEventListener("click",function(){showCourtPlacement(false)});
-  document.getElementById("courtBehind").addEventListener("click",function(){showCourtPlacement(true)});
-  showCourtPlacement(document.body.classList.contains("court-tabs"));
+    "<button disabled>Ask partner to join</button></div></div></section>";
   throw new Error("Independent Supabase project must be configured before registration opens.");
 }
 const dbClient = window.supabase.createClient(
@@ -1459,9 +1431,7 @@ function renderPilotTeamRegistration(){
       "</form><p>Your partner will see the invitation here after signing in. They will not receive an automatic email from this form.</p>";
   }
 
-  return html + "</div><figure class='join-photo'>" +
-    "<img src='local-court.jpg' alt='An empty local pickleball court ready for play' loading='lazy'>" +
-    "</figure></section>";
+  return html + "</div></section>";
 }
 
 async function requestPilotTeam(event){

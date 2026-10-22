@@ -3,7 +3,7 @@
 This branch prepares the independent ladder's name and public-facing copy. It is **not ready to deploy for registration**. Its browser database settings are placeholders, and startup stops with a setup message until a separate Supabase project is configured. Do not substitute the VPA project credentials.
 
 The header uses an Okanagan lake photograph supplied by the organizer (`kal-lake-user.jpg`). The published copy has its location metadata removed.
-The team signup area uses the organizer's court photograph (`local-court.jpg`), and the navigation buttons use another organizer court photograph (`court-tabs.jpg`), both without location metadata. The navigation photo is the default. While the independent database settings are placeholders, the page displays a disabled signup layout and lets the organizer compare the photo beside signup or behind the navigation buttons. Choose one placement before launching registration.
+The navigation buttons use the organizer's court photograph (`court-tabs.jpg`) without location metadata. The photo is behind the buttons, as selected by the organizer. While the independent database settings are placeholders, the page displays a disabled signup layout.
 
 Before inviting players:
 
