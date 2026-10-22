@@ -2,6 +2,8 @@
 
 This branch prepares the independent ladder's name and public-facing copy. It is **not ready to deploy for registration**. Its browser database settings are placeholders, and startup stops with a setup message until a separate Supabase project is configured. Do not substitute the VPA project credentials.
 
+The header uses an Okanagan lake photograph supplied by the organizer (`kal-lake-user.jpg`). The published copy has its location metadata removed.
+
 Before inviting players:
 
 1. Create an independent Supabase project and a separate Vercel project/domain. Give the independent project its own one active club record representing the Okanagan Pickleball Ladder. Do not connect the VPA database or Auth project.
