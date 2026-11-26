@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pilot approval check · PaddleLadder</title>
+<style>
+body{font:16px system-ui,sans-serif;background:#f6f8f4;color:#173135;margin:0;padding:2rem}
+main{max-width:34rem;margin:auto;background:white;padding:2rem;border-radius:1rem;box-shadow:0 4px 20px #153c391c}
+h1{margin-top:0} label{display:block;margin:1rem 0}input{display:block;width:100%;box-sizing:border-box;padding:.75rem;font:inherit}
+button{background:#087084;color:white;border:0;border-radius:.4rem;padding:.8rem 1.2rem;font:inherit;cursor:pointer}
+button:disabled{opacity:.5}#result{margin-top:1.2rem;min-height:3rem;white-space:pre-wrap}
+small{display:block;color:#526264;margin-top:1rem}
+</style>
+<main>
+  <h1>PaddleLadder pilot approval check</h1>
+  <p>This page uses the <strong>PaddleLadder Pilot Test</strong> database. It checks whether your confirmed email is approved to join the pilot club.</p>
+  <form id="login">
+    <label>Email<input name="email" type="email" autocomplete="username" required></label>
+    <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+    <button id="check" type="submit">Check approval</button>
+  </form>
+  <p id="result" role="status" aria-live="polite"></p>
+  <small>For testing only. No team or ladder data is changed by this page.</small>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const client = window.supabase.createClient(
+  "https://xcozpadxvpjkgoflhjgr.supabase.co",
+  "sb_publishable_IKoj6tm9zIDe5F5-h39-_g_s1AgxA_j",
+  {auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}}
+);
+const form=document.getElementById("login");
+const result=document.getElementById("result");
+const button=document.getElementById("check");
+form.addEventListener("submit",async event=>{
+  event.preventDefault();
+  button.disabled=true;
+  result.textContent="Checking…";
+  try{
+    const email=form.elements.email.value.trim();
+    const password=form.elements.password.value;
+    const login=await client.auth.signInWithPassword({email,password});
+    if(login.error){ result.textContent="Sign-in failed: "+login.error.message; return; }
+    const check=await client.rpc("join_pilot_club_secure");
+    result.textContent=check.error
+      ? "Not approved: "+check.error.message
+      : "Approved. This account can join the pilot club.";
+  }catch(error){
+    result.textContent="Could not complete the check. Please try again.";
+  }finally{
+    form.elements.password.value="";
+    await client.auth.signOut();
+    button.disabled=false;
+  }
+});
+</script>
+</html>
