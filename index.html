@@ -3124,18 +3124,7 @@ function renderPartnerForm(){
     "<p><b>DUPR</b><br>" +
     "<input id='partnerDupr' type='number' step='0.01' placeholder='Example: 4.25' style='width:100%;padding:10px;'></p>" +
 
-    "<p><b>Looking for</b><br>" +
-    "<select id='partnerLadder' disabled style='width:100%;padding:10px;'>" +
-     "<option value='mens' " +
-  (currentLadder === "mens" ? "selected" : "") +
-  ">Men's Ladder</option>" +
-"<option value='womens' " +
-  (currentLadder === "womens" ? "selected" : "") +
-  ">Women's Ladder</option>" +
-"<option value='mixed' " +
-  (currentLadder === "mixed" ? "selected" : "") +
-  ">Mixed Ladder</option>" +
-    "</select></p>" +
+    "<input type='hidden' id='partnerLadder' value='" + currentLadder + "'>" +
 
 
 
