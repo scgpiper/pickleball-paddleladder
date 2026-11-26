@@ -83,12 +83,10 @@ main{
   background:linear-gradient(90deg,rgba(10,42,48,.64),rgba(10,42,48,.4)),url("court-tabs.jpg") center 53% / cover;
   box-shadow:0 12px 28px rgba(11,45,48,.16);
 }
-.grid button:not(:first-child){background:rgba(15,84,105,.94)}
-.grid button:not(:first-child):hover{background:#125263}
-
-.grid button{min-height:66px;text-align:left;padding:16px 20px}
-.grid button:first-child{background:#d7ed3d;color:#163139}
-.grid button:first-child:hover{background:#c8df2d}
+.grid button{min-height:66px;text-align:left;padding:16px 20px;background:rgba(15,84,105,.94)}
+.grid button:hover{background:#125263}
+.grid button.active{background:#d7ed3d;color:#163139}
+.grid button.active:hover{background:#c8df2d}
 
 button{
   border:0;
@@ -311,13 +309,13 @@ body.lobby-mode > header,body.lobby-mode > main{display:none}
 <main>
 
 <div class="grid">
-  <button onclick="show('board')">🏆 Leaderboard</button>
-  <button onclick="show('challenge')">⚔️ My Challenges</button>
-  <button onclick="show('score')">✍️ Enter Score</button>
-  <button onclick="show('rules')">❓ Rules / Help</button>
-  <button onclick="show('partners')">🤝 Partner Connect</button>
-  <button onclick="show('history')">📊 History / Stats</button>
- <button onclick="show('admin')">🛡️ Admin Review</button>
+  <button data-page="board" class="active" aria-current="page" onclick="show('board')">🏆 Leaderboard</button>
+  <button data-page="challenge" onclick="show('challenge')">⚔️ My Challenges</button>
+  <button data-page="score" onclick="show('score')">✍️ Enter Score</button>
+  <button data-page="rules" onclick="show('rules')">❓ Rules / Help</button>
+  <button data-page="partners" onclick="show('partners')">🤝 Partner Connect</button>
+  <button data-page="history" onclick="show('history')">📊 History / Stats</button>
+ <button data-page="admin" onclick="show('admin')">🛡️ Admin Review</button>
 </div>
 
 <div id="content" class="card"></div>
@@ -1219,6 +1217,14 @@ function recordLadderMovements(previousRanks,reason){
   });
 }
 function show(page){
+
+  const navPage = page === "admin" && !isAdmin() ? "board" : page;
+  document.querySelectorAll(".grid button[data-page]").forEach(function(button){
+    const selected = button.dataset.page === navPage;
+    button.classList.toggle("active", selected);
+    if(selected) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
 
   if(page==="board") renderBoard();
   if(page==="challenge") renderChallenges();
