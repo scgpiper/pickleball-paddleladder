@@ -3109,17 +3109,12 @@ function renderPartnerForm(){
     "<p><b>Name</b><br>" +
     "<input id='partnerName' placeholder='Your name' style='width:100%;padding:10px;'></p>" +
 
-   "<p><b>Gender</b><br>" +
-"<select id='partnerGender' style='width:100%;padding:10px;'>" +
-  (
-    currentLadder === "mens"
-      ? "<option value='Male'>Male</option>"
-      : currentLadder === "womens"
-        ? "<option value='Female'>Female</option>"
-        : "<option value='Male'>Male</option>" +
-          "<option value='Female'>Female</option>"
-  ) +
-"</select></p>" +
+    "<p><b>Gender</b><br>" +
+    "<select id='partnerGender' style='width:100%;padding:10px;'>" +
+      "<option value='' selected disabled>Select your gender</option>" +
+      "<option value='Male'>Male</option>" +
+      "<option value='Female'>Female</option>" +
+    "</select></p>" +
 
     "<p><b>DUPR</b><br>" +
     "<input id='partnerDupr' type='number' step='0.01' placeholder='Example: 4.25' style='width:100%;padding:10px;'></p>" +
@@ -3142,6 +3137,14 @@ async function savePartnerListing(){
   const gender = document.getElementById("partnerGender").value;
   const dupr = document.getElementById("partnerDupr").value;
   const ladder = document.getElementById("partnerLadder").value;
+  if(!["Male","Female"].includes(gender)){
+    alert("Please select your gender.");
+    return;
+  }
+  if(!["mens","womens","mixed"].includes(ladder)){
+    alert("Please choose a valid ladder.");
+    return;
+  }
 if(ladder === "mens" && gender !== "Male"){
   alert("The Men's Ladder is available only to male players.");
   return;
