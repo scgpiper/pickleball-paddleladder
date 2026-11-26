@@ -27,7 +27,7 @@ function event(header = secret) {
   });
 }
 
-function mocks({ failEmail = "" } = {}) {
+function mocks({ failEmail = "", createdAt = "2026-10-01T12:00:00Z" } = {}) {
   const claims = new Set();
   const messages = [];
   const db = {
@@ -42,7 +42,7 @@ function mocks({ failEmail = "" } = {}) {
       if (table === "challenges") return {
         select: () => ({ eq: () => ({ single: async () => ({
           data: {
-            id: challengeId, status: "Pending", created_at: "2026-10-01T12:00:00Z",
+            id: challengeId, status: "Pending", created_at: createdAt,
             challenger_team_id: challengerId, challenged_team_id: challengedId
           }, error: null
         }) }) })
@@ -132,4 +132,18 @@ test("Vercel Node request and response deliver challenge email", async () => {
   assert.equal(result.body.sent, 2);
   assert.equal(result.headers["Cache-Control"], "no-store");
   assert.equal(messages.length, 2);
+});
+
+test("challenge notification uses 48 hours and Vancouver standard time in November", async () => {
+  configure();
+  const { handler, messages } = mocks({ createdAt: "2026-11-26T20:51:00Z" });
+  assert.equal((await handler(event())).status, 200);
+  assert.match(messages[0].text, /Nov 28, 2026, 12:51 p\.m\. PST/);
+  assert.doesNotMatch(messages[0].text, /PDT/);
+});
+test("challenge notification uses daylight time in summer", async () => {
+  configure();
+  const { handler, messages } = mocks({ createdAt: "2026-07-10T19:00:00Z" });
+  assert.equal((await handler(event())).status, 200);
+  assert.match(messages[0].text, /Jul 12, 2026, 12:00 p\.m\. PDT/);
 });
