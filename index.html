@@ -587,6 +587,8 @@ async function signOutUser(){
   partnerListings = [];
   partnerInvites = [];
   teamRegistrationRequests = [];
+  matchSchedules = new Map();
+  courtBookings = new Map();
   await loadLadderState();
   renderBoard();
 }
@@ -636,7 +638,8 @@ async function loadLadderState(){
     currentUser && ENABLE_TEAM_REGISTRATION
       ? dbClient.rpc("my_pilot_team_requests_secure")
       : Promise.resolve({ data: [], error: null }),
-    currentUser ? dbClient.rpc("my_match_schedules_secure") : Promise.resolve({data: [],error:null})
+    currentUser ? dbClient.rpc("my_match_schedules_secure") : Promise.resolve({data: [],error:null}),
+    currentUser ? dbClient.rpc("my_match_court_bookings_secure") : Promise.resolve({data: [],error:null})
   ]);
 
   const failedResult = results.find(function(result){
@@ -650,6 +653,7 @@ async function loadLadderState(){
 
   teamRegistrationRequests = results[7].data || [];
   matchSchedules = new Map((results[8].data || []).map(row => [row.challenge_id,row]));
+  courtBookings = new Map((results[9].data || []).map(row => [row.challenge_id,row]));
 
   teams = (results[0].data || []).map(function(row){
     return {
@@ -837,6 +841,7 @@ let teams = [];
 let challengeHistory=[];
 let pendingChallenges=[];
 let matchSchedules = new Map();
+let courtBookings = new Map();
  let ladderMovementHistory=[];
 
 
@@ -2227,6 +2232,18 @@ function renderMatchSchedule(item){
       html+="<p>Waiting for the other team to confirm.</p>";
     }
   }
+  if(record && record.confirmed_at){
+    const booked=courtBookings.get(item.id);
+    if(booked){
+      html+="<p><b>✓ Court booking reported</b> by "+
+        escapeHtml(booked.booked_by_team_id===myTeam.id?"your team":"the opposing team")+
+        ".</p><p class='muted'>Booking status is player-reported; verify the reservation directly with VPA if needed.</p>";
+    }else{
+      html+="<p><b>Court not yet marked as booked.</b> After reserving through the VPA portal, "+
+        "one player should mark it here so both teams know.</p>"+
+        "<button class='smallBtn' onclick='acknowledgeCourtBooked()'>I Booked the Court</button>";
+    }
+  }
   if(!record || !record.confirmed_at){
     html+="<p><b>Suggest a match date and time</b></p>"+
       "<div style='display:flex;gap:12px;flex-wrap:wrap'>"+
@@ -2286,6 +2303,12 @@ async function proposeMatchTime(){
     requested_challenge_id:challenge.id,requested_start:time.toISOString(),
     requested_venue:venue,requested_note:note
   },"Proposing match time"))renderChallenges();
+}
+async function acknowledgeCourtBooked(){
+  if(!challenge || challenge.status!=="Accepted" || !myTeam || !canManageTeam(myTeam))return;
+  if(!window.confirm("Have you already completed the court reservation in the VPA portal? This does NOT book a court."))return;
+  if(await callSecureFunction("acknowledge_court_booked_secure",
+    {requested_challenge_id:challenge.id},"Marking court booking"))renderChallenges();
 }
 async function confirmMatchTime(){
   if(!challenge || challenge.status!=="Accepted" || !myTeam || !canManageTeam(myTeam))return;
