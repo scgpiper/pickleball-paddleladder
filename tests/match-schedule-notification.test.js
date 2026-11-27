@@ -75,3 +75,12 @@ test("Vercel wrapper accepts Supabase event payload",async()=>{
   assert.equal(res.statusCode,200);
   assert.equal(sent.length,2);
 });
+
+test("court booking notification reaches opposing players",async()=>{
+  setup();
+  const {handler,sent}=mocks("booked");
+  assert.equal((await handler(event())).status,200);
+  assert.equal(sent.length,2);
+  assert.match(sent[0].subject,/court booking reported/i);
+  assert.match(sent[0].text,/booking status is reported by a player/i);
+});
