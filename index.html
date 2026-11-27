@@ -2228,24 +2228,56 @@ function renderMatchSchedule(item){
     }
   }
   if(!record || !record.confirmed_at){
-    html+="<p><b>Suggest a date and time</b> (displayed in your device timezone)</p>"+
-      "<input type='datetime-local' id='scheduleTime' style='width:100%;padding:10px'>"+
-      "<p><b>Location</b></p><input id='scheduleVenue' maxlength='120' placeholder='VPA facility' style='width:100%;padding:10px'>"+
-      "<p><b>Optional note</b></p><textarea id='scheduleNote' maxlength='500' style='width:100%;padding:10px'></textarea>"+
+    html+="<p><b>Suggest a match date and time</b></p>"+
+      "<div style='display:flex;gap:12px;flex-wrap:wrap'>"+
+        "<label style='flex:1;min-width:170px'>Date (Pacific Time)"+
+        "<input type='date' id='scheduleDate' style='display:block;width:100%;padding:10px;margin-top:5px'></label>"+
+        "<label style='flex:1;min-width:130px'>Time (Pacific Time)"+
+        "<input type='time' id='scheduleClock' value='18:00' step='900' style='display:block;width:100%;padding:10px;margin-top:5px'></label>"+
+      "</div>"+
+      "<p class='muted'>Select the date and the time you want to play. Times use the Pacific time zone.</p>"+
+      "<label for='scheduleVenue'><b>Location</b></label>"+
+      "<input id='scheduleVenue' maxlength='120' value='VPA facility' style='width:100%;padding:10px'>"+
+      "<p><label for='scheduleNote'><b>Optional note</b></label></p>"+
+      "<textarea id='scheduleNote' maxlength='500' style='width:100%;padding:10px'></textarea>"+
       "<button class='smallBtn' onclick='proposeMatchTime()'>"+(record?"Send Counteroffer":"Propose Match Time")+"</button>";
   }
   html+="<p><a href='https://player.courtreserve.com/players/courts/ca/british-columbia/vernon/vernon-pickleball-association' target='_blank' rel='noopener noreferrer'>Book on CourtReserve</a></p>"+
-    "<p class='muted'>Please confirm court availability separately. Scheduling never extends the seven-day match deadline.</p></section>";
+    "<p class='muted'>A proposal does not reserve a court. Scheduling never extends the seven-day deadline.</p></section>";
   return html;
+}
+// Convert the chosen Pacific wall-clock time to an absolute time, including
+// daylight saving offsets. Reject nonexistent spring-forward wall times.
+function pacificMatchInstant(dateText,clockText){
+  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(dateText) ||
+     !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(clockText))return null;
+  const [year,month,day]=dateText.split("-").map(Number);
+  const [hour,minute]=clockText.split(":").map(Number);
+  const base=Date.UTC(year,month-1,day,hour,minute);
+  const fmt=new Intl.DateTimeFormat("en-CA",{
+    timeZone:"America/Vancouver",hourCycle:"h23",
+    year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"
+  });
+  const wanted=dateText+" "+clockText;
+  const matches=[];
+  for(const offsetHours of [7,8]){
+    const instant=new Date(base+offsetHours*3600000);
+    const parts=Object.fromEntries(fmt.formatToParts(instant).map(p=>[p.type,p.value]));
+    const actual=parts.year+"-"+parts.month+"-"+parts.day+" "+parts.hour+":"+parts.minute;
+    if(actual===wanted)matches.push(instant);
+  }
+  // Fall-back hour occurs twice; use the first occurrence consistently.
+  return matches.length ? matches[0] : null;
 }
 async function proposeMatchTime(){
   if(!challenge || challenge.status!=="Accepted" || !myTeam || !canManageTeam(myTeam))return;
-  const value=document.getElementById("scheduleTime").value;
-  const time=new Date(value),venue=document.getElementById("scheduleVenue").value.trim(),
-    note=document.getElementById("scheduleNote").value.trim();
-  if(!value || !Number.isFinite(time.getTime()) || time<=new Date() ||
-     (challenge.playBy && time.getTime()>challenge.playBy)){
-    alert("Choose a future time before the match deadline.");return;
+  const day=document.getElementById("scheduleDate").value;
+  const clock=document.getElementById("scheduleClock").value;
+  const time=pacificMatchInstant(day,clock);
+  const venue=document.getElementById("scheduleVenue").value.trim();
+  const note=document.getElementById("scheduleNote").value.trim();
+  if(!time || time<=new Date() || (challenge.playBy && time.getTime()>challenge.playBy)){
+    alert("Choose a valid future Pacific date and time before the seven-day match deadline.");return;
   }
   if(venue.length<2 || venue.length>120 || note.length>500){
     alert("A location of 2–120 characters is required; notes may be up to 500 characters.");return;
