@@ -13,6 +13,14 @@
 - CourtReserve link opens a separate site. Booking is never automatic.
 - App refresh is required to see other players' scheduling updates until realtime/polling is added.
 
+## Court booking responsibility (Pilot Test only)
+- After the court-booking acknowledgement migration, apply `sql/match_court_booking_claim_pilot.sql` in Pilot Test **before** opening the newest preview; the app calls a new RPC on load.
+- **I'll Book the Court** reserves responsibility, NOT the actual court. Both teams can see which team volunteered.
+- **I've Booked the Court** is shown only to the volunteering team and records their report that a real external reservation is complete.
+- **I Can't Book It** releases the task for another team to volunteer, before booking is reported.
+- Booking claims are private to participating teams; the one-time claiming function is concurrency protected, and the existing seven-day deadline remains authoritative.
+- Note: no email event is currently sent for the volunteer/release actions; the existing `booked` event remains the notification trigger for the completed reservation.
+
 ## Court booking acknowledgment
 - Apply `sql/match_court_booking_pilot.sql` **after** the original scheduling migration, initially in Pilot Test only.
 - Once a match date/time is confirmed, either participating team can click **I Booked the Court** after an actual external reservation.
