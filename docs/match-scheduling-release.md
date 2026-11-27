@@ -13,16 +13,23 @@
 - CourtReserve link opens a separate site. Booking is never automatic.
 - App refresh is required to see other players' scheduling updates until realtime/polling is added.
 
+## Court booking acknowledgment
+- Apply `sql/match_court_booking_pilot.sql` **after** the original scheduling migration, initially in Pilot Test only.
+- Once a match date/time is confirmed, either participating team can click **I Booked the Court** after an actual external reservation.
+- This stores who reported the booking and shows **Court booking reported** to both teams. It does **not** verify a reservation with VPA or book anything automatically.
+- The action is accepted once per challenge; if a booking is cancelled or needs changing, a future controlled correction flow is needed.
+- `booked` event is recorded for the opposing team to receive a notification when the webhook is configured.
+
 ## Setup in isolated staging Supabase project
 1. Confirm `private.team_members` and `public.challenges` schema columns match the migration's assumptions.
-2. Apply `sql/match_scheduling_secure.sql` in staging SQL editor, **not** production.
+2. Apply `sql/match_scheduling_secure.sql` (if not already installed) followed by `sql/match_court_booking_pilot.sql` in staging SQL editor, **not** production.
 3. Check function privileges: anon cannot execute RPCs; authenticated may execute only the three participant-checked RPCs; service_role exclusively executes the notification lookup.
-4. Add a new Vercel environment variable `MATCH_SCHEDULE_WEBHOOK_SECRET` (strong random secret); reuse the existing SMTP and service role settings for the test deployment.
+4. Add a new Vercel environment variable `MATCH_SCHEDULE_WEBHOOK_SECRET` (strong random secret); set `PADDLELADDER_BASE_URL` to the actual Pilot Test preview address; use **Pilot Test** `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, not the live database; reuse existing SMTP settings only when appropriate for testing.
 5. In Supabase Database Webhooks, create an INSERT webhook for table `public.match_schedule_events` aimed at `https://<preview-host>/api/match-schedule-notification`; set header `x-match-schedule-webhook-secret` equal to the Vercel secret. Do **not** disclose the secret in screenshots.
 6. Ensure the preview is wired to staging Supabase credentials, not the production DB.
 7. Run `node --test tests/*.test.js` (requires `npm ci` first) and review results.
-8. Verify access with two real authenticated staging teams: proposed -> email to other team -> counteroffer -> email -> confirm -> email to proposing team -> agreed time displayed on both accounts.
-9. Verify attacker cases: unauthenticated user, unrelated player, own-team confirmation, proposed date outside the accepted challenge window, changes after confirmation, data and emails invisible to bystanders. Confirm that legacy challenge flow and score entry still work.
+8. Verify access with two authenticated staging teams: proposed -> email to other team -> counteroffer -> email -> confirm -> email to proposing team -> agreed time displayed on both accounts -> a team reports an actual booking -> opposing team sees status and receives email.
+9. Verify attacker cases: unauthenticated user, unrelated player, own-team confirmation, proposed date outside the accepted challenge window, changes after confirmation, booking acknowledgment before a confirmed date, duplicate booking acknowledgment, data and emails invisible to bystanders. Confirm that legacy challenge flow and score entry still work.
 10. Only after staging checks pass, apply migration to production **before** merging PR #29; configure production webhook to the production endpoint, set production secret; merge and run a controlled two-team smoke test.
 
 ## Important limitations
