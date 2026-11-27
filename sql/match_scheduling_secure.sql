@@ -19,6 +19,9 @@ create table if not exists public.match_schedule_events (
   id uuid primary key default gen_random_uuid(),
   challenge_id uuid not null references public.challenges(id) on delete cascade,
   event_type text not null check (event_type in ('proposed','confirmed')),
+  recipient_team_id uuid not null references public.ladder_teams(id) on delete cascade,
+  proposed_start timestamptz not null,
+  venue text not null,
   created_at timestamptz not null default now()
 );
 alter table public.match_schedule_events enable row level security;
@@ -89,7 +92,8 @@ begin
     set proposed_by_team_id=excluded.proposed_by_team_id,
         proposed_start=excluded.proposed_start,venue=excluded.venue,
         note=excluded.note,confirmed_at=null,updated_at=now();
-  insert into public.match_schedule_events(challenge_id,event_type) values (c.id,'proposed');
+  insert into public.match_schedule_events(challenge_id,event_type,recipient_team_id,proposed_start,venue)
+    values (c.id,'proposed',case when caller_team=c.challenger_team_id then c.challenged_team_id else c.challenger_team_id end,requested_start,cleaned_venue);
 end;
 $fn$;
 
@@ -121,7 +125,8 @@ begin
   update private.match_schedules set confirmed_at=now(),updated_at=now()
     where challenge_id=c.id and confirmed_at is null;
   if not found then raise exception 'This time was already confirmed'; end if;
-  insert into public.match_schedule_events(challenge_id,event_type) values(c.id,'confirmed');
+  insert into public.match_schedule_events(challenge_id,event_type,recipient_team_id,proposed_start,venue)
+    values(c.id,'confirmed',s.proposed_by_team_id,s.proposed_start,s.venue);
 end;
 $fn$;
 
@@ -140,7 +145,7 @@ returns table(event_type text, event_created_at timestamptz,
 language sql stable security definer set search_path to ''
 as $fn$
   select e.event_type,e.created_at,e.challenge_id,
-         s.proposed_start,s.venue,ct.name::text,dt.name::text,
+         e.proposed_start,e.venue,ct.name::text,dt.name::text,
          lower(pg_catalog.btrim(m.email)) as recipient_email
   from public.match_schedule_events e
   join public.challenges c on c.id=e.challenge_id
@@ -148,14 +153,9 @@ as $fn$
   join public.ladder_teams ct on ct.id=c.challenger_team_id and ct.club_id=c.club_id
   join public.ladder_teams dt on dt.id=c.challenged_team_id and dt.club_id=c.club_id
   join private.team_members m on m.club_id=c.club_id and m.ladder=c.ladder
-    and m.team_id = case
-      when e.event_type='proposed' then
-        case when s.proposed_by_team_id=c.challenger_team_id then c.challenged_team_id
-             else c.challenger_team_id end
-      else s.proposed_by_team_id end
+    and m.team_id=e.recipient_team_id
   where e.id=requested_event_id
-    and c.status='Accepted'
-    and (e.event_type='proposed' or s.confirmed_at is not null)
+    and c.status in ('Accepted','Awaiting Confirmation')
     and m.email is not null and pg_catalog.btrim(m.email)<>''
   order by recipient_email
   limit 2;
