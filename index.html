@@ -323,8 +323,8 @@ body.lobby-mode > header,body.lobby-mode > main{display:none}
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SUPABASE_URL = "https://lnxqaqxrtxtkiiikaqhg.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_hsbU7OslX93sjImve7QdAg_ZIbOC8oE";
+const SUPABASE_URL = "https://xcozpadxvpjkgoflhjgr.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_IKoj6tm9zIDe5F5-h39-_g_s1AgxA_j";
 const dbClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
@@ -587,6 +587,9 @@ async function signOutUser(){
   partnerListings = [];
   partnerInvites = [];
   teamRegistrationRequests = [];
+  matchSchedules = new Map();
+  courtBookings = new Map();
+  bookingClaims = new Map();
   await loadLadderState();
   renderBoard();
 }
@@ -635,7 +638,10 @@ async function loadLadderState(){
       : Promise.resolve({ data: [], error: null }),
     currentUser && ENABLE_TEAM_REGISTRATION
       ? dbClient.rpc("my_pilot_team_requests_secure")
-      : Promise.resolve({ data: [], error: null })
+      : Promise.resolve({ data: [], error: null }),
+    currentUser ? dbClient.rpc("my_match_schedules_secure") : Promise.resolve({data: [],error:null}),
+    currentUser ? dbClient.rpc("my_match_court_bookings_secure") : Promise.resolve({data: [],error:null}),
+    currentUser ? dbClient.rpc("my_match_court_booking_claims_secure") : Promise.resolve({data: [],error:null})
   ]);
 
   const failedResult = results.find(function(result){
@@ -648,6 +654,9 @@ async function loadLadderState(){
   }
 
   teamRegistrationRequests = results[7].data || [];
+  matchSchedules = new Map((results[8].data || []).map(row => [row.challenge_id,row]));
+  courtBookings = new Map((results[9].data || []).map(row => [row.challenge_id,row]));
+  bookingClaims = new Map((results[10].data || []).map(row => [row.challenge_id,row]));
 
   teams = (results[0].data || []).map(function(row){
     return {
@@ -834,6 +843,9 @@ let teams = [];
   let matchHistory=[];
 let challengeHistory=[];
 let pendingChallenges=[];
+let matchSchedules = new Map();
+let courtBookings = new Map();
+let bookingClaims = new Map();
  let ladderMovementHistory=[];
 
 
@@ -2205,6 +2217,132 @@ function expireOldChallenges(){
 }
 
 
+
+function matchDate(iso){
+  return new Intl.DateTimeFormat("en-CA", {timeZone:"America/Vancouver",dateStyle:"medium",timeStyle:"short"}).format(new Date(iso));
+}
+function renderMatchSchedule(item){
+  const record=matchSchedules.get(item.id);
+  let html="<section class='notice'><h3>Arrange your match</h3>";
+  if(record){
+    html+="<p><b>"+(record.confirmed_at?"Confirmed":"Proposed")+":</b> "+
+      escapeHtml(matchDate(record.proposed_start))+"<br><b>Location:</b> "+
+      escapeHtml(record.venue)+"</p>";
+    if(record.note)html+="<p><b>Note:</b> "+escapeHtml(record.note)+"</p>";
+    if(!record.confirmed_at && record.proposed_by_team_id!==myTeam.id){
+      html+="<button class='acceptBtn smallBtn' onclick='confirmMatchTime()'>Confirm Proposed Time</button>";
+    }
+    if(!record.confirmed_at && record.proposed_by_team_id===myTeam.id){
+      html+="<p>Waiting for the other team to confirm.</p>";
+    }
+  }
+  if(record && record.confirmed_at){
+    const booked=courtBookings.get(item.id);
+    if(booked){
+      html+="<p><b>✓ Court booking reported</b> by "+
+        escapeHtml(booked.booked_by_team_id===myTeam.id?"your team":"the opposing team")+
+        ".</p><p class='muted'>Booking status is player-reported; verify the reservation directly with VPA if needed.</p>";
+    }else{
+      const claim=bookingClaims.get(item.id);
+      if(claim){
+        const ours=claim.claimed_by_team_id===myTeam.id;
+        html+="<p><b>Court booking pending:</b> "+
+          escapeHtml(ours?"Your team has volunteered to book the court.":"The opposing team has volunteered to book the court.")+
+          "</p>";
+        if(ours){
+          html+="<button class='smallBtn' onclick='acknowledgeCourtBooked()'>I've Booked the Court</button> "+
+            "<button class='smallBtn' onclick='releaseCourtBookingClaim()'>I Can't Book It</button>";
+        }
+      }else{
+        html+="<p><b>Court not yet assigned for booking.</b> Either team can volunteer to handle the reservation.</p>"+
+          "<button class='smallBtn' onclick='claimCourtBooking()'>I'll Book the Court</button>";
+      }
+    }
+  }
+  if(!record || !record.confirmed_at){
+    html+="<p><b>Suggest a match date and time</b></p>"+
+      "<div style='display:flex;gap:12px;flex-wrap:wrap'>"+
+        "<label style='flex:1;min-width:170px'>Date (Pacific Time)"+
+        "<input type='date' id='scheduleDate' style='display:block;width:100%;padding:10px;margin-top:5px'></label>"+
+        "<label style='flex:1;min-width:130px'>Time (Pacific Time)"+
+        "<input type='time' id='scheduleClock' value='18:00' step='900' style='display:block;width:100%;padding:10px;margin-top:5px'></label>"+
+      "</div>"+
+      "<p class='muted'>Select the date and the time you want to play. Times use the Pacific time zone.</p>"+
+      "<label for='scheduleVenue'><b>Location</b></label>"+
+      "<input id='scheduleVenue' maxlength='120' value='VPA facility' style='width:100%;padding:10px'>"+
+      "<p><label for='scheduleNote'><b>Optional note</b></label></p>"+
+      "<textarea id='scheduleNote' maxlength='500' style='width:100%;padding:10px'></textarea>"+
+      "<button class='smallBtn' onclick='proposeMatchTime()'>"+(record?"Send Counteroffer":"Propose Match Time")+"</button>";
+  }
+  html+="<p><a href='https://www.vernonpickleball.com/' target='_blank' rel='noopener noreferrer'>Book via VPA Player Portal</a></p>"+
+    "<p class='muted'>A proposal does not reserve a court. Scheduling never extends the seven-day deadline.</p></section>";
+  return html;
+}
+// Convert the chosen Pacific wall-clock time to an absolute time, including
+// daylight saving offsets. Reject nonexistent spring-forward wall times.
+function pacificMatchInstant(dateText,clockText){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dateText) ||
+     !/^([01]\d|2[0-3]):[0-5]\d$/.test(clockText))return null;
+  const [year,month,day]=dateText.split("-").map(Number);
+  const [hour,minute]=clockText.split(":").map(Number);
+  const base=Date.UTC(year,month-1,day,hour,minute);
+  const fmt=new Intl.DateTimeFormat("en-CA",{
+    timeZone:"America/Vancouver",hourCycle:"h23",
+    year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"
+  });
+  const wanted=dateText+" "+clockText;
+  const matches=[];
+  for(const offsetHours of [7,8]){
+    const instant=new Date(base+offsetHours*3600000);
+    const parts=Object.fromEntries(fmt.formatToParts(instant).map(p=>[p.type,p.value]));
+    const actual=parts.year+"-"+parts.month+"-"+parts.day+" "+parts.hour+":"+parts.minute;
+    if(actual===wanted)matches.push(instant);
+  }
+  // Fall-back hour occurs twice; use the first occurrence consistently.
+  return matches.length ? matches[0] : null;
+}
+async function proposeMatchTime(){
+  if(!challenge || challenge.status!=="Accepted" || !myTeam || !canManageTeam(myTeam))return;
+  const day=document.getElementById("scheduleDate").value;
+  const clock=document.getElementById("scheduleClock").value;
+  const time=pacificMatchInstant(day,clock);
+  const venue=document.getElementById("scheduleVenue").value.trim();
+  const note=document.getElementById("scheduleNote").value.trim();
+  if(!time || time<=new Date() || (challenge.playBy && time.getTime()>challenge.playBy)){
+    alert("Choose a valid future Pacific date and time before the seven-day match deadline.");return;
+  }
+  if(venue.length<2 || venue.length>120 || note.length>500){
+    alert("A location of 2–120 characters is required; notes may be up to 500 characters.");return;
+  }
+  if(await callSecureFunction("propose_match_schedule_secure",{
+    requested_challenge_id:challenge.id,requested_start:time.toISOString(),
+    requested_venue:venue,requested_note:note
+  },"Proposing match time"))renderChallenges();
+}
+async function claimCourtBooking(){
+  if(!challenge || challenge.status!=="Accepted" || !myTeam || !canManageTeam(myTeam))return;
+  if(!window.confirm("Your team will be responsible for booking this court through the VPA portal. Continue?"))return;
+  if(await callSecureFunction("claim_court_booking_secure",
+    {requested_challenge_id:challenge.id},"Volunteering to book the court"))renderChallenges();
+}
+async function releaseCourtBookingClaim(){
+  if(!challenge || challenge.status!=="Accepted" || !myTeam || !canManageTeam(myTeam))return;
+  if(!window.confirm("Give up the booking task so the other team can volunteer?"))return;
+  if(await callSecureFunction("release_court_booking_claim_secure",
+    {requested_challenge_id:challenge.id},"Releasing court booking task"))renderChallenges();
+}
+async function acknowledgeCourtBooked(){
+  if(!challenge || challenge.status!=="Accepted" || !myTeam || !canManageTeam(myTeam))return;
+  if(!window.confirm("Have you already completed the court reservation in the VPA portal? This does NOT book a court."))return;
+  if(await callSecureFunction("acknowledge_court_booked_secure",
+    {requested_challenge_id:challenge.id},"Marking court booking"))renderChallenges();
+}
+async function confirmMatchTime(){
+  if(!challenge || challenge.status!=="Accepted" || !myTeam || !canManageTeam(myTeam))return;
+  if(await callSecureFunction("confirm_match_schedule_secure",
+    {requested_challenge_id:challenge.id},"Confirming match time"))renderChallenges();
+}
+
 function renderChallenges(){
   expireOldChallenges();
 
@@ -2331,6 +2469,7 @@ if(challenge.status==="Decline Pending Admin Review"){
       ".<br><br><b>Status:</b> Accepted"+
       "</div>"+
       "<p>The match must be played within 7 days.</p>"+
+      renderMatchSchedule(challenge)+
       "<button onclick='show(\"score\")'>Enter Match Result</button>";
     return;
   }
