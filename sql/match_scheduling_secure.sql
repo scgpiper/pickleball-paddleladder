@@ -13,6 +13,17 @@ create table if not exists private.match_schedules (
   updated_at timestamptz not null default now()
 );
 alter table private.match_schedules enable row level security;
+
+-- Outbox contains event references only; no personal contact details.
+create table if not exists public.match_schedule_events (
+  id uuid primary key default gen_random_uuid(),
+  challenge_id uuid not null references public.challenges(id) on delete cascade,
+  event_type text not null check (event_type in ('proposed','confirmed')),
+  created_at timestamptz not null default now()
+);
+alter table public.match_schedule_events enable row level security;
+revoke all on public.match_schedule_events from public,anon,authenticated;
+grant select on public.match_schedule_events to service_role;
 revoke all on private.match_schedules from public, anon, authenticated;
 
 create or replace function public.my_match_schedules_secure()
@@ -68,6 +79,9 @@ begin
     raise exception 'Venue must be 2–120 characters; note at most 500 characters';
   end if;
 
+  if exists (select 1 from private.match_schedules where challenge_id=c.id and confirmed_at is not null) then
+    raise exception 'The scheduled time is confirmed; contact the administrator to change it';
+  end if;
   insert into private.match_schedules as s
     (challenge_id,proposed_by_team_id,proposed_start,venue,note,confirmed_at,updated_at)
   values (c.id,caller_team,requested_start,cleaned_venue,cleaned_note,null,now())
@@ -75,6 +89,7 @@ begin
     set proposed_by_team_id=excluded.proposed_by_team_id,
         proposed_start=excluded.proposed_start,venue=excluded.venue,
         note=excluded.note,confirmed_at=null,updated_at=now();
+  insert into public.match_schedule_events(challenge_id,event_type) values (c.id,'proposed');
 end;
 $fn$;
 
@@ -105,6 +120,8 @@ begin
   end if;
   update private.match_schedules set confirmed_at=now(),updated_at=now()
     where challenge_id=c.id and confirmed_at is null;
+  if not found then raise exception 'This time was already confirmed'; end if;
+  insert into public.match_schedule_events(challenge_id,event_type) values(c.id,'confirmed');
 end;
 $fn$;
 
@@ -114,5 +131,46 @@ revoke all on function public.confirm_match_schedule_secure(uuid) from public,an
 grant execute on function public.my_match_schedules_secure() to authenticated;
 grant execute on function public.propose_match_schedule_secure(uuid,timestamptz,text,text) to authenticated;
 grant execute on function public.confirm_match_schedule_secure(uuid) to authenticated;
+
+-- Server-only event lookup provides schedule and recipient addresses to webhook handler.
+create or replace function public.match_schedule_notification_secure(requested_event_id uuid)
+returns table(event_type text, event_created_at timestamptz,
+  challenge_id uuid, proposed_start timestamptz, venue text,
+  challenger_name text, challenged_name text, recipient_email text)
+language sql stable security definer set search_path to ''
+as $fn$
+  select e.event_type,e.created_at,e.challenge_id,
+         s.proposed_start,s.venue,ct.name::text,dt.name::text,
+         lower(pg_catalog.btrim(m.email)) as recipient_email
+  from public.match_schedule_events e
+  join public.challenges c on c.id=e.challenge_id
+  join private.match_schedules s on s.challenge_id=e.challenge_id
+  join public.ladder_teams ct on ct.id=c.challenger_team_id and ct.club_id=c.club_id
+  join public.ladder_teams dt on dt.id=c.challenged_team_id and dt.club_id=c.club_id
+  join private.team_members m on m.club_id=c.club_id and m.ladder=c.ladder
+    and m.team_id = case
+      when e.event_type='proposed' then
+        case when s.proposed_by_team_id=c.challenger_team_id then c.challenged_team_id
+             else c.challenger_team_id end
+      else s.proposed_by_team_id end
+  where e.id=requested_event_id
+    and c.status='Accepted'
+    and (e.event_type='proposed' or s.confirmed_at is not null)
+    and m.email is not null and pg_catalog.btrim(m.email)<>''
+  order by recipient_email
+  limit 2;
+$fn$;
+revoke all on function public.match_schedule_notification_secure(uuid) from public,anon,authenticated;
+grant execute on function public.match_schedule_notification_secure(uuid) to service_role;
+
+create table if not exists public.match_schedule_email_notices (
+  event_id uuid not null references public.match_schedule_events(id) on delete cascade,
+  email text not null,
+  sent_at timestamptz,
+  primary key(event_id,email)
+);
+alter table public.match_schedule_email_notices enable row level security;
+revoke all on public.match_schedule_email_notices from public,anon,authenticated;
+grant select,insert,update,delete on public.match_schedule_email_notices to service_role;
 
 commit;
