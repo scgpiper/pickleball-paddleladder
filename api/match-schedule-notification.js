@@ -30,7 +30,7 @@ export function makeHandler({dbFactory=createClient,mailerFactory=nodemailer.cre
     if(error)return result(500,{error:"Could not load scheduling notification"});
     if(!Array.isArray(data) || !data.length)return result(200,{skipped:"No recipients or match closed"});
     const item=data[0];
-    if(!["proposed","confirmed"].includes(item.event_type) ||
+    if(!["proposed","confirmed","booked"].includes(item.event_type) ||
        !item.proposed_start || !item.venue || !item.challenger_name || !item.challenged_name)
       return result(500,{error:"Incomplete event"});
     const recipients=[...new Set(data.map(r=>String(r.recipient_email||"").trim().toLowerCase())
@@ -50,14 +50,19 @@ export function makeHandler({dbFactory=createClient,mailerFactory=nodemailer.cre
       hour:"numeric",minute:"2-digit",timeZoneName:"short"
     });
     const confirmed=item.event_type==="confirmed";
-    const subject=confirmed?"PaddleLadder match time confirmed":"PaddleLadder match time proposed";
+    const booked=item.event_type==="booked";
+    const subject=booked?"PaddleLadder court booking reported":
+      confirmed?"PaddleLadder match time confirmed":"PaddleLadder match time proposed";
     const body=[
       `Match: ${item.challenger_name} vs. ${item.challenged_name}`,
-      confirmed?"The opposing team confirmed your proposed time.":"The opposing team has proposed a match time.",
+      booked?"The opposing team reports that a court has been booked through the VPA portal.":
+        confirmed?"The opposing team confirmed your proposed time.":"The opposing team has proposed a match time.",
       `Date and time: ${time}`,`Location: ${item.venue}`,"",
-      confirmed?"Please confirm your court booking separately.":"Sign in to confirm this time or suggest an alternative.",
-      "Open PaddleLadder: https://vpaladder.pickleballpatrol.ca/","",
-      "A proposed time does not reserve a court."
+      booked?"Please verify the booking with the opposing team if necessary.":
+        confirmed?"Please book a court through the VPA portal if not already done.":
+          "Sign in to confirm this time or suggest an alternative.",
+      "Open PaddleLadder: "+(process.env.PADDLELADDER_BASE_URL || "https://vpaladder.pickleballpatrol.ca/"),"",
+      "PaddleLadder does not book courts automatically; booking status is reported by a player."
     ].join("\n");
     let sent=0,duplicate=0,failed=0;
     for(const email of recipients){
