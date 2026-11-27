@@ -589,6 +589,7 @@ async function signOutUser(){
   teamRegistrationRequests = [];
   matchSchedules = new Map();
   courtBookings = new Map();
+  bookingClaims = new Map();
   await loadLadderState();
   renderBoard();
 }
@@ -639,7 +640,8 @@ async function loadLadderState(){
       ? dbClient.rpc("my_pilot_team_requests_secure")
       : Promise.resolve({ data: [], error: null }),
     currentUser ? dbClient.rpc("my_match_schedules_secure") : Promise.resolve({data: [],error:null}),
-    currentUser ? dbClient.rpc("my_match_court_bookings_secure") : Promise.resolve({data: [],error:null})
+    currentUser ? dbClient.rpc("my_match_court_bookings_secure") : Promise.resolve({data: [],error:null}),
+    currentUser ? dbClient.rpc("my_match_court_booking_claims_secure") : Promise.resolve({data: [],error:null})
   ]);
 
   const failedResult = results.find(function(result){
@@ -654,6 +656,7 @@ async function loadLadderState(){
   teamRegistrationRequests = results[7].data || [];
   matchSchedules = new Map((results[8].data || []).map(row => [row.challenge_id,row]));
   courtBookings = new Map((results[9].data || []).map(row => [row.challenge_id,row]));
+  bookingClaims = new Map((results[10].data || []).map(row => [row.challenge_id,row]));
 
   teams = (results[0].data || []).map(function(row){
     return {
@@ -842,6 +845,7 @@ let challengeHistory=[];
 let pendingChallenges=[];
 let matchSchedules = new Map();
 let courtBookings = new Map();
+let bookingClaims = new Map();
  let ladderMovementHistory=[];
 
 
@@ -2239,9 +2243,20 @@ function renderMatchSchedule(item){
         escapeHtml(booked.booked_by_team_id===myTeam.id?"your team":"the opposing team")+
         ".</p><p class='muted'>Booking status is player-reported; verify the reservation directly with VPA if needed.</p>";
     }else{
-      html+="<p><b>Court not yet marked as booked.</b> After reserving through the VPA portal, "+
-        "one player should mark it here so both teams know.</p>"+
-        "<button class='smallBtn' onclick='acknowledgeCourtBooked()'>I Booked the Court</button>";
+      const claim=bookingClaims.get(item.id);
+      if(claim){
+        const ours=claim.claimed_by_team_id===myTeam.id;
+        html+="<p><b>Court booking pending:</b> "+
+          escapeHtml(ours?"Your team has volunteered to book the court.":"The opposing team has volunteered to book the court.")+
+          "</p>";
+        if(ours){
+          html+="<button class='smallBtn' onclick='acknowledgeCourtBooked()'>I've Booked the Court</button> "+
+            "<button class='smallBtn' onclick='releaseCourtBookingClaim()'>I Can't Book It</button>";
+        }
+      }else{
+        html+="<p><b>Court not yet assigned for booking.</b> Either team can volunteer to handle the reservation.</p>"+
+          "<button class='smallBtn' onclick='claimCourtBooking()'>I'll Book the Court</button>";
+      }
     }
   }
   if(!record || !record.confirmed_at){
@@ -2303,6 +2318,18 @@ async function proposeMatchTime(){
     requested_challenge_id:challenge.id,requested_start:time.toISOString(),
     requested_venue:venue,requested_note:note
   },"Proposing match time"))renderChallenges();
+}
+async function claimCourtBooking(){
+  if(!challenge || challenge.status!=="Accepted" || !myTeam || !canManageTeam(myTeam))return;
+  if(!window.confirm("Your team will be responsible for booking this court through the VPA portal. Continue?"))return;
+  if(await callSecureFunction("claim_court_booking_secure",
+    {requested_challenge_id:challenge.id},"Volunteering to book the court"))renderChallenges();
+}
+async function releaseCourtBookingClaim(){
+  if(!challenge || challenge.status!=="Accepted" || !myTeam || !canManageTeam(myTeam))return;
+  if(!window.confirm("Give up the booking task so the other team can volunteer?"))return;
+  if(await callSecureFunction("release_court_booking_claim_secure",
+    {requested_challenge_id:challenge.id},"Releasing court booking task"))renderChallenges();
 }
 async function acknowledgeCourtBooked(){
   if(!challenge || challenge.status!=="Accepted" || !myTeam || !canManageTeam(myTeam))return;
