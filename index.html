@@ -334,6 +334,7 @@ let currentUserIsAdmin = false;
 let authFormMode = "signIn";
 const ENABLE_TEAM_REGISTRATION = true;
 let teamRegistrationRequests = [];
+let playerProfile = null;
 
 function escapeHtml(value){
   return String(value ?? "").replace(/[&<>"']/g, character => ({
@@ -385,7 +386,11 @@ async function submitPasswordAuth(event){
   const form = event.currentTarget;
   const email = form.elements.email.value.trim();
   const password = form.elements.password.value;
+  const fullName = authFormMode === "signUp" ? form.elements.fullName.value.trim() : "";
   const message = document.getElementById("authMessage");
+  if(authFormMode === "signUp" && (fullName.length < 2 || fullName.length > 80 || !/^[\p{L}\p{N}][\p{L}\p{N} .\x27-]*$/u.test(fullName))){
+    message.textContent = "Enter your player name (2–80 characters).";return;
+  }
 
   if(authFormMode === "signUp" && password !== form.elements.confirmPassword.value){
     message.textContent = "The passwords do not match.";
@@ -401,7 +406,7 @@ async function submitPasswordAuth(event){
       ? await dbClient.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin }
+          options: { emailRedirectTo: window.location.origin, data: { full_name: fullName } }
         })
       : await dbClient.auth.signInWithPassword({ email, password });
 
@@ -587,6 +592,7 @@ async function signOutUser(){
   partnerListings = [];
   partnerInvites = [];
   teamRegistrationRequests = [];
+  playerProfile = null;
   matchSchedules = new Map();
   courtBookings = new Map();
   bookingClaims = new Map();
@@ -641,7 +647,8 @@ async function loadLadderState(){
       : Promise.resolve({ data: [], error: null }),
     currentUser ? dbClient.rpc("my_match_schedules_secure") : Promise.resolve({data: [],error:null}),
     currentUser ? dbClient.rpc("my_match_court_bookings_secure") : Promise.resolve({data: [],error:null}),
-    currentUser ? dbClient.rpc("my_match_court_booking_claims_secure") : Promise.resolve({data: [],error:null})
+    currentUser ? dbClient.rpc("my_match_court_booking_claims_secure") : Promise.resolve({data: [],error:null}),
+    currentUser && !isAdmin() ? dbClient.rpc("my_pilot_player_profile_secure") : Promise.resolve({data: [],error:null})
   ]);
 
   const failedResult = results.find(function(result){
@@ -654,6 +661,7 @@ async function loadLadderState(){
   }
 
   teamRegistrationRequests = results[7].data || [];
+  playerProfile = currentUser && !isAdmin() ? ((results[11].data || [])[0] || null) : null;
   matchSchedules = new Map((results[8].data || []).map(row => [row.challenge_id,row]));
   courtBookings = new Map((results[9].data || []).map(row => [row.challenge_id,row]));
   bookingClaims = new Map((results[10].data || []).map(row => [row.challenge_id,row]));
@@ -1395,8 +1403,38 @@ async function adminAddTeam(){
 }
 
 
+function renderPilotProfileForm(){
+  if(!currentUser || isAdmin() || (playerProfile && playerProfile.division_category))return "";
+  const defaultName = playerProfile && playerProfile.display_name !== "Member" ? playerProfile.display_name : "";
+  return "<section class='notice'><h3>Complete your player profile</h3>" +
+    "<p>Everyone may view every ladder. Before joining a team, enter your name and division eligibility. This choice is private; changes require administrator review.</p>" +
+    "<form class='auth-form' onsubmit='completePilotProfile(event)'>" +
+    "<label>Player name<input name='displayName' minlength='2' maxlength='80' required value='" + escapeHtml(defaultName) + "'></label>" +
+    "<label>Division eligibility<select name='divisionCategory' required>" +
+    "<option value=''>Select...</option><option value='man'>Men's and mixed</option>" +
+    "<option value='woman'>Women's and mixed</option><option value='review'>Request eligibility review</option>" +
+    "</select></label><button type='submit'>Save profile</button></form></section>";
+}
+async function completePilotProfile(event){
+  event.preventDefault();
+  const form=event.currentTarget;
+  const button=form.querySelector('button[type=submit]');
+  button.disabled=true;
+  try{
+    if(await callSecureFunction("complete_pilot_player_profile_secure",{
+      requested_name: form.elements.displayName.value.trim(),
+      requested_category: form.elements.divisionCategory.value
+    },"Saving player profile")){
+      if(await loadLadderState()){
+        myTeam=findCurrentUsersTeam();
+        renderBoard();
+      }
+    }
+  }finally{ button.disabled=false; }
+}
 function renderPilotTeamRegistration(){
   if(!ENABLE_TEAM_REGISTRATION || !currentUser || isAdmin()) return "";
+  if(!playerProfile || !playerProfile.division_category) return "";
 
   const pending = teamRegistrationRequests.filter(function(request){
     return request.ladder === currentLadder && request.status === "pending";
@@ -1424,7 +1462,7 @@ function renderPilotTeamRegistration(){
     html += "<p>Create a two-player team. Your partner must sign in and accept before it appears on the ladder.</p>" +
       "<form class='auth-form' onsubmit='requestPilotTeam(event)'>" +
         "<label>Team name<input name='teamName' maxlength='80' minlength='2' required></label>" +
-        "<label>Your name<input name='captainName' maxlength='80' minlength='2' required></label>" +
+        "<label>Your name<input name='captainName' maxlength='80' minlength='2' readonly required value='" + escapeHtml(playerProfile.display_name || "") + "'></label>" +
         "<label>Your DUPR (leave blank for NR)<input name='captainDupr' type='number' min='0.01' max='10' step='0.01'></label>" +
         "<label>Partner's name<input name='partnerName' maxlength='80' minlength='2' required></label>" +
         "<label>Partner's email<input name='partnerEmail' type='email' required></label>" +
@@ -1439,6 +1477,7 @@ function renderPilotTeamRegistration(){
 async function requestPilotTeam(event){
   event.preventDefault();
   if(!ENABLE_TEAM_REGISTRATION || !currentUser) return;
+  if(!playerProfile || !playerProfile.division_category){alert("Complete your player profile before requesting a team.");return;}
   const form = event.currentTarget;
   const captainDupr = form.elements.captainDupr.value;
   const partnerDupr = form.elements.partnerDupr.value;
@@ -1448,7 +1487,7 @@ async function requestPilotTeam(event){
     if(await callSecureFunction("request_pilot_team_secure",{
       requested_ladder: currentLadder,
       requested_team_name: form.elements.teamName.value.trim(),
-      requested_captain_name: form.elements.captainName.value.trim(),
+      requested_captain_name: playerProfile.display_name,
       requested_captain_dupr: captainDupr ? Number(captainDupr) : null,
       requested_captain_is_nr: !captainDupr,
       requested_partner_name: form.elements.partnerName.value.trim(),
@@ -1466,6 +1505,9 @@ async function requestPilotTeam(event){
 
 async function respondPilotTeamRequest(id,accept){
   if(!ENABLE_TEAM_REGISTRATION || !currentUser) return;
+  if(accept && (!playerProfile || !playerProfile.division_category)){
+    alert("Complete your player profile before accepting a team.");return;
+  }
   if(await callSecureFunction("respond_pilot_team_request_secure",{
     requested_request_id: id, requested_accept: accept
   },accept ? "Accepting team" : "Declining team")){
@@ -1527,6 +1569,7 @@ function renderBoard(){
         "<p>" + (authFormMode === "signUp" ? "Create an account" : "Sign in") + " with your email and password.</p>" +
         "<form class='auth-form' onsubmit='submitPasswordAuth(event)'>" +
           "<label>Email<input id='authEmail' name='email' type='email' autocomplete='email' required></label>" +
+          (authFormMode === "signUp" ? "<label>Player name<input name='fullName' type='text' minlength='2' maxlength='80' autocomplete='name' required></label>" : "") +
           "<label>Password<input name='password' type='password' minlength='8' autocomplete='" +
             (authFormMode === "signUp" ? "new-password" : "current-password") + "' required></label>" +
           (authFormMode === "signUp"
@@ -1545,6 +1588,7 @@ function renderBoard(){
   const assignmentHtml =
     currentUser &&
     !isAdmin() &&
+    playerProfile && playerProfile.division_category &&
     !findCurrentUsersTeam()
       ? (ENABLE_TEAM_REGISTRATION
         ? "<div class='warning'>You are not on a team in this ladder yet. Create a team below or accept an invitation.</div>"
@@ -1561,6 +1605,7 @@ function renderBoard(){
       "<option value='mixed' " + (currentLadder === "mixed" ? "selected" : "") + ">Mixed Ladder</option>" +
     "</select>" +
     assignmentHtml +
+    renderPilotProfileForm() +
     renderPilotTeamRegistration() +
     "<p><b>Which team are you?</b></p>" +
     "<select onchange='selectTeam(this.value)'>" + options + "</select>";
