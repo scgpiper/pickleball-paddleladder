@@ -93,10 +93,15 @@ DECLARE
   partner_category text;
   captain_name text;
   partner_name text;
+  should_check boolean := false;
 BEGIN
-  IF TG_OP = 'INSERT' OR
-     (TG_OP = 'UPDATE' AND NEW.status='accepted'
-       AND OLD.status IS DISTINCT FROM 'accepted') THEN
+  IF TG_OP = 'INSERT' THEN
+    should_check := true;
+  ELSIF TG_OP = 'UPDATE' THEN
+    should_check := NEW.status = 'accepted' AND OLD.status IS DISTINCT FROM 'accepted';
+  END IF;
+
+  IF should_check THEN
 
     SELECT d.division_category, p.display_name
       INTO captain_category, captain_name
