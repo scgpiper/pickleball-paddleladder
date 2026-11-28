@@ -1425,8 +1425,10 @@ async function completePilotProfile(event){
       requested_name: form.elements.displayName.value.trim(),
       requested_category: form.elements.divisionCategory.value
     },"Saving player profile")){
-      myTeam=findCurrentUsersTeam();
-      renderBoard();
+      if(await loadLadderState()){
+        myTeam=findCurrentUsersTeam();
+        renderBoard();
+      }
     }
   }finally{ button.disabled=false; }
 }
@@ -1460,7 +1462,7 @@ function renderPilotTeamRegistration(){
     html += "<p>Create a two-player team. Your partner must sign in and accept before it appears on the ladder.</p>" +
       "<form class='auth-form' onsubmit='requestPilotTeam(event)'>" +
         "<label>Team name<input name='teamName' maxlength='80' minlength='2' required></label>" +
-        "<label>Your name<input name='captainName' maxlength='80' minlength='2' required></label>" +
+        "<label>Your name<input name='captainName' maxlength='80' minlength='2' readonly required value='" + escapeHtml(playerProfile.display_name || "") + "'></label>" +
         "<label>Your DUPR (leave blank for NR)<input name='captainDupr' type='number' min='0.01' max='10' step='0.01'></label>" +
         "<label>Partner's name<input name='partnerName' maxlength='80' minlength='2' required></label>" +
         "<label>Partner's email<input name='partnerEmail' type='email' required></label>" +
@@ -1485,7 +1487,7 @@ async function requestPilotTeam(event){
     if(await callSecureFunction("request_pilot_team_secure",{
       requested_ladder: currentLadder,
       requested_team_name: form.elements.teamName.value.trim(),
-      requested_captain_name: form.elements.captainName.value.trim(),
+      requested_captain_name: playerProfile.display_name,
       requested_captain_dupr: captainDupr ? Number(captainDupr) : null,
       requested_captain_is_nr: !captainDupr,
       requested_partner_name: form.elements.partnerName.value.trim(),
