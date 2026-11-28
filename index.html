@@ -1432,6 +1432,43 @@ async function completePilotProfile(event){
     }
   }finally{ button.disabled=false; }
 }
+function renderPilotDuprEditor(){
+  if(!currentUser || isAdmin() || !playerProfile || !playerProfile.division_category) return "";
+  const savedDupr = playerProfile.dupr == null ? "" : String(playerProfile.dupr);
+  return "<details class='notice'><summary><b>My DUPR rating:</b> " +
+    (savedDupr ? escapeHtml(savedDupr) : "NR (not rated)") +
+    " — Edit</summary><p>This is your self-reported DUPR rating, reused when you register for another ladder. Leave blank if not rated. Changing it does not change existing team rankings.</p>" +
+    "<form class='auth-form' onsubmit='savePilotDupr(event)'>" +
+    "<label>DUPR rating<input name='dupr' type='number' min='0.01' max='10' step='0.01' value='" + escapeHtml(savedDupr) + "'></label>" +
+    "<button type='submit'>Save DUPR</button></form><p id='pilotDuprMessage' role='status'></p></details>";
+}
+async function savePilotDupr(event){
+  event.preventDefault();
+  if(!currentUser || !playerProfile || !playerProfile.division_category) return;
+  const form = event.currentTarget;
+  const raw = form.elements.dupr.value.trim();
+  const rating = raw === "" ? null : Number(raw);
+  const message = document.getElementById("pilotDuprMessage");
+  if(rating !== null && (!Number.isFinite(rating) || rating < 0.01 || rating > 10 ||
+     Math.round(rating * 100) !== rating * 100)){
+    message.textContent = "Enter a DUPR between 0.01 and 10.00, with at most two decimal places.";
+    return;
+  }
+  const button = form.querySelector('button[type="submit"]');
+  button.disabled = true;
+  try{
+    const result = await dbClient.from("profiles").update({dupr: rating}).eq("id",currentUser.id).select("id");
+    if(result.error || !result.data || result.data.length !== 1){
+      message.textContent = "Could not save DUPR: " + (result.error ? result.error.message : "profile not updated");
+      return;
+    }
+    if(await loadLadderState()) renderBoard();
+  }catch(error){
+    message.textContent = "Could not save DUPR. Try again.";
+  }finally{
+    button.disabled = false;
+  }
+}
 function renderPilotTeamRegistration(){
   if(!ENABLE_TEAM_REGISTRATION || !currentUser || isAdmin()) return "";
   if(!playerProfile || !playerProfile.division_category) return "";
@@ -1463,7 +1500,7 @@ function renderPilotTeamRegistration(){
       "<form class='auth-form' onsubmit='requestPilotTeam(event)'>" +
         "<label>Team name<input name='teamName' maxlength='80' minlength='2' required></label>" +
         "<label>Your name<input name='captainName' maxlength='80' minlength='2' readonly required value='" + escapeHtml(playerProfile.display_name || "") + "'></label>" +
-        "<label>Your DUPR (leave blank for NR)<input name='captainDupr' type='number' min='0.01' max='10' step='0.01'></label>" +
+        "<label>Your DUPR (from your player profile)<input name='captainDupr' type='number' min='0.01' max='10' step='0.01' readonly value='" + escapeHtml(playerProfile.dupr == null ? "" : playerProfile.dupr) + "'></label>" +
         "<label>Partner's name<input name='partnerName' maxlength='80' minlength='2' required></label>" +
         "<label>Partner's email<input name='partnerEmail' type='email' required></label>" +
         "<label>Partner's DUPR (leave blank for NR)<input name='partnerDupr' type='number' min='0.01' max='10' step='0.01'></label>" +
@@ -1479,7 +1516,7 @@ async function requestPilotTeam(event){
   if(!ENABLE_TEAM_REGISTRATION || !currentUser) return;
   if(!playerProfile || !playerProfile.division_category){alert("Complete your player profile before requesting a team.");return;}
   const form = event.currentTarget;
-  const captainDupr = form.elements.captainDupr.value;
+  const captainDupr = playerProfile.dupr == null ? "" : String(playerProfile.dupr);
   const partnerDupr = form.elements.partnerDupr.value;
   const button = form.querySelector('button[type="submit"]');
   button.disabled = true;
@@ -1606,6 +1643,7 @@ function renderBoard(){
     "</select>" +
     assignmentHtml +
     renderPilotProfileForm() +
+    renderPilotDuprEditor() +
     renderPilotTeamRegistration() +
     "<p><b>Which team are you?</b></p>" +
     "<select onchange='selectTeam(this.value)'>" + options + "</select>";
